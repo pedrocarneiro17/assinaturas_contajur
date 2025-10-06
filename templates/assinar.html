@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Coletar Assinatura{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-lg">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-pen"></i> Documento para Assinatura</h5>
+            </div>
+            <div class="card-body">
+                <!-- Informações do Documento -->
+                <div class="border rounded p-4 mb-4 bg-light">
+                    <h5 class="text-primary mb-3">INFORMAÇÕES DO DOCUMENTO</h5>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <strong>Cliente:</strong><br>
+                            <span class="fs-5">{{ documento.cliente.nome }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>{{ 'CPF' if documento.cliente.tipo == 'PF' else 'CNPJ' }}:</strong><br>
+                            <span class="fs-5">{{ documento.cliente.documento }}</span>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <strong>Competência:</strong><br>
+                            <span class="fs-6">{{ documento.competencia }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Prazo de Entrega:</strong><br>
+                            <span class="fs-6">{{ documento.prazo_entrega.strftime('%d/%m/%Y') }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Responsável:</strong><br>
+                            <span class="fs-6">{{ documento.responsavel }}</span>
+                        </div>
+                    </div>
+
+                    {% set situacoes = documento.situacoes|from_json %}
+                    <div class="mb-3">
+                        <strong>Situações:</strong>
+                        <ul class="mt-2">
+                            {% for sit in situacoes %}
+                            <li>
+                                {{ sit.texto }}
+                                <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-2">
+                                    {{ sit.departamento|upper }}
+                                </span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    {% if documento.descricao %}
+                    <div>
+                        <strong>Descrição:</strong><br>
+                        <p class="mb-0 mt-2">{{ documento.descricao }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Área de Assinatura -->
+                <div class="text-center mb-4">
+                    <h5 class="text-primary mb-3">ASSINATURA DO CLIENTE</h5>
+                    <p class="text-muted">Desenhe sua assinatura abaixo usando o mouse ou touch</p>
+                    
+                    <div class="d-flex justify-content-center mb-3">
+                        <canvas id="signature-pad" class="signature-canvas" width="700" height="300"></canvas>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-center">
+                        <button type="button" class="btn btn-outline-secondary" onclick="limparAssinatura()">
+                            <i class="bi bi-eraser"></i> Limpar
+                        </button>
+                        <button type="button" class="btn btn-success btn-lg" onclick="salvarAssinatura()">
+                            <i class="bi bi-check-circle"></i> Confirmar Assinatura
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-danger">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                    </div>
+                </div>
+
+                <div class="alert alert-info mt-4">
+                    <i class="bi bi-info-circle"></i> <strong>Importante:</strong> 
+                    Ao confirmar a assinatura, você atesta que recebeu os documentos relacionados às informações acima.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const canvas = document.getElementById('signature-pad');
+    const ctx = canvas.getContext('2d');
+    let desenhando = false;
+    let assinado = false;
+
+    // Configurar canvas
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    // Mouse events
+    canvas.addEventListener('mousedown', iniciarDesenho);
+    canvas.addEventListener('mousemove', desenhar);
+    canvas.addEventListener('mouseup', pararDesenhar);
+    canvas.addEventListener('mouseout', pararDesenhar);
+
+    // Touch events
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousedown', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousemove', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        const mouseEvent = new MouseEvent('mouseup', {});
+        canvas.dispatchEvent(mouseEvent);
+    });
+
+    function iniciarDesenho(e) {
+        desenhando = true;
+        assinado = true;
+        const rect = canvas.getBoundingClientRect();
+        ctx.beginPath();
+        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
+
+    function desenhar(e) {
+        if (!desenhando) return;
+        const rect = canvas.getBoundingClientRect();
+        ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+        ctx.stroke();
+    }
+
+    function pararDesenhar() {
+        desenhando = false;
+    }
+
+    function limparAssinatura() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        assinado = false;
+    }
+
+    function salvarAssinatura() {
+        if (!assinado) {
+            alert('Por favor, desenhe a assinatura antes de confirmar.');
+            return;
+        }
+
+        const dataURL = canvas.toDataURL('image/png');
+        
+        fetch('{{ url_for("salvar_assinatura", id=documento.id) }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ assinatura: dataURL })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.sucesso) {
+                alert('Assinatura salva com sucesso!');
+                window.location.href = '{{ url_for("dashboard") }}';
+            } else {
+                alert('Erro ao salvar assinatura.');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao salvar assinatura.');
+        });
+    }
+</script>
+{% endblock %}

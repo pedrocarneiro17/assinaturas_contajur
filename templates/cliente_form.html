@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-person-plus"></i> Cadastrar Novo Cliente</h5>
+            </div>
+            <div class="card-body">
+                {% if erro %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i> {{ erro }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+                
+                <form method="POST" onsubmit="return validarFormulario()">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome / Razão Social *</label>
+                        <input type="text" class="form-control" id="nome" name="nome" required autofocus>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tipo *</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="tipo" id="tipoPF" value="PF" checked onchange="alterarTipo()">
+                                <label class="form-check-label" for="tipoPF">
+                                    Pessoa Física
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="tipo" id="tipoPJ" value="PJ" onchange="alterarTipo()">
+                                <label class="form-check-label" for="tipoPJ">
+                                    Pessoa Jurídica
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="documento" class="form-label" id="labelDocumento">CPF *</label>
+                        <input type="text" class="form-control" id="documento" name="documento" placeholder="000.000.000-00" required>
+                        <small class="form-text text-muted" id="helperDocumento">Formato: 000.000.000-00</small>
+                        <div class="invalid-feedback" id="documentoError"></div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Salvar
+                        </button>
+                        <a href="{{ url_for('clientes') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function alterarTipo() {
+        const tipoPF = document.getElementById('tipoPF').checked;
+        const label = document.getElementById('labelDocumento');
+        const helper = document.getElementById('helperDocumento');
+        const input = document.getElementById('documento');
+        
+        if (tipoPF) {
+            label.textContent = 'CPF *';
+            helper.textContent = 'Formato: 000.000.000-00';
+            input.placeholder = '000.000.000-00';
+            input.maxLength = 14;
+        } else {
+            label.textContent = 'CNPJ *';
+            helper.textContent = 'Formato: 00.000.000/0000-00';
+            input.placeholder = '00.000.000/0000-00';
+            input.maxLength = 18;
+        }
+        input.value = '';
+    }
+    
+    // Máscara de CPF/CNPJ
+    document.getElementById('documento').addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        const tipoPF = document.getElementById('tipoPF').checked;
+        
+        if (tipoPF) {
+            // Máscara CPF: 000.000.000-00
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        } else {
+            // Máscara CNPJ: 00.000.000/0000-00
+            value = value.replace(/(\d{2})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d)/, '$1/$2');
+            value = value.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+        }
+        
+        e.target.value = value;
+    });
+    
+    function validarFormulario() {
+        const tipoPF = document.getElementById('tipoPF').checked;
+        const documento = document.getElementById('documento').value.replace(/\D/g, '');
+        const input = document.getElementById('documento');
+        const error = document.getElementById('documentoError');
+        
+        if (tipoPF) {
+            if (documento.length !== 11) {
+                input.classList.add('is-invalid');
+                error.textContent = 'CPF deve conter 11 dígitos';
+                return false;
+            }
+        } else {
+            if (documento.length !== 14) {
+                input.classList.add('is-invalid');
+                error.textContent = 'CNPJ deve conter 14 dígitos';
+                return false;
+            }
+        }
+        
+        input.classList.remove('is-invalid');
+        return true;
+    }
+</script>
+{% endblock %}

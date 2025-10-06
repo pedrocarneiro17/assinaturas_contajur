@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Visualizar Documento{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-lg">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documento Assinado</h5>
+                <button onclick="window.print()" class="btn btn-light btn-sm">
+                    <i class="bi bi-printer"></i> Imprimir
+                </button>
+            </div>
+            <div class="card-body" id="documento-impressao">
+                <!-- Cabeçalho -->
+                <div class="text-center mb-4">
+                    <h4 class="text-primary">COMPROVANTE DE RECEBIMENTO DE DOCUMENTOS</h4>
+                    <hr>
+                </div>
+
+                <!-- Informações do Cliente -->
+                <div class="mb-4">
+                    <h5 class="bg-light p-2 border-start border-primary border-4">DADOS DO CLIENTE</h5>
+                    <div class="row mt-3">
+                        <div class="col-md-8">
+                            <strong>Nome/Razão Social:</strong><br>
+                            <span class="fs-5">{{ documento.cliente.nome }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>{{ 'CPF' if documento.cliente.tipo == 'PF' else 'CNPJ' }}:</strong><br>
+                            <span class="fs-5">{{ documento.cliente.documento }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações do Documento -->
+                <div class="mb-4">
+                    <h5 class="bg-light p-2 border-start border-primary border-4">INFORMAÇÕES DO DOCUMENTO</h5>
+                    <div class="row mt-3">
+                        <div class="col-md-4 mb-3">
+                            <strong>Competência:</strong><br>
+                            {{ documento.competencia }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <strong>Prazo de Entrega:</strong><br>
+                            {{ documento.prazo_entrega.strftime('%d/%m/%Y') }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <strong>Responsável:</strong><br>
+                            {{ documento.responsavel }}
+                        </div>
+                    </div>
+
+                    {% set situacoes = documento.situacoes|from_json %}
+                    <div class="mb-3">
+                        <strong>Situações Documentadas:</strong>
+                        <ul class="mt-2">
+                            {% for sit in situacoes %}
+                            <li>
+                                {{ sit.texto }}
+                                <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-2">
+                                    {{ sit.departamento|upper }}
+                                </span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    {% if documento.descricao %}
+                    <div>
+                        <strong>Descrição:</strong>
+                        <p class="border-start border-3 ps-3 mt-2">{{ documento.descricao }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Assinatura -->
+                <div class="mb-4">
+                    <h5 class="bg-light p-2 border-start border-success border-4">ASSINATURA</h5>
+                    <div class="text-center mt-4">
+                        {% if documento.assinatura %}
+                        <img src="{{ documento.assinatura }}" alt="Assinatura" class="border" style="max-width: 500px;">
+                        {% endif %}
+                        <div class="mt-3">
+                            <hr style="width: 400px; margin: 20px auto 10px;">
+                            <strong>{{ documento.cliente.nome }}</strong><br>
+                            <small class="text-muted">{{ documento.cliente.documento }}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações de Registro -->
+                <div class="mt-4 p-3 bg-light border rounded">
+                    <div class="row small text-muted">
+                        <div class="col-md-6">
+                            <strong>Data de Criação:</strong> {{ documento.data_criacao.strftime('%d/%m/%Y às %H:%M') }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Data da Assinatura:</strong> {{ documento.data_assinatura.strftime('%d/%m/%Y às %H:%M') }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-white">
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Voltar ao Dashboard
+                    </a>
+                    <a href="{{ url_for('historico_cliente', id=documento.cliente.id) }}" class="btn btn-info">
+                        <i class="bi bi-clock-history"></i> Ver Histórico do Cliente
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        nav, .card-footer, .btn, .no-print {
+            display: none !important;
+        }
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .card-header {
+            background-color: #198754 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+    }
+</style>
+{% endblock %}

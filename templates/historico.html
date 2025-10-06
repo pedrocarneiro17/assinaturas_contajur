@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .card-documentos {
+        min-height: 450px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-clock-history"></i> Histórico de Documentos</h2>
+        <p class="text-muted mb-0">
+            <strong>Cliente:</strong> {{ cliente.nome }}<br>
+            <strong>{{ 'CPF' if cliente.tipo == 'PF' else 'CNPJ' }}:</strong> {{ cliente.documento }}
+        </p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-3">
+                <label class="form-label mb-0 fw-bold">Filtrar por Status:</label>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="filtroStatus" id="filtroTodos" value="todos" checked onchange="filtrarDocumentos()">
+                    <label class="btn btn-outline-primary" for="filtroTodos">
+                        <i class="bi bi-list-ul"></i> Todos
+                    </label>
+
+                    <input type="radio" class="btn-check" name="filtroStatus" id="filtroAssinados" value="assinado" onchange="filtrarDocumentos()">
+                    <label class="btn btn-outline-success" for="filtroAssinados">
+                        <i class="bi bi-check-circle"></i> Assinados
+                    </label>
+
+                    <input type="radio" class="btn-check" name="filtroStatus" id="filtroPendentes" value="pendente" onchange="filtrarDocumentos()">
+                    <label class="btn btn-outline-warning" for="filtroPendentes">
+                        <i class="bi bi-clock"></i> Pendentes
+                    </label>
+                </div>
+            </div>
+            <span class="badge bg-secondary fs-6 px-3 py-2" id="contadorFiltro">Mostrando todos os documentos</span>
+        </div>
+    </div>
+</div>
+
+<div class="card card-documentos">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Documentos <span id="totalDocumentos">({{ cliente.documentos|length }})</span></h5>
+    </div>
+    <div class="card-body p-0" style="height: 350px; overflow-y: auto;">
+        {% set todos_docs = cliente.documentos|sort(attribute='data_criacao', reverse=true) %}
+        {% if todos_docs %}
+        <div class="table-responsive h-100">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Status</th>
+                        <th>Competência</th>
+                        <th>Prazo Entrega</th>
+                        <th>Data</th>
+                        <th>Situações</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaDocumentos">
+                    {% for doc in todos_docs %}
+                    <tr data-status="{{ doc.status }}" class="documento-linha">
+                        <td>
+                            {% if doc.status == 'assinado' %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> Assinado
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-clock"></i> Pendente
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ doc.competencia }}</strong></td>
+                        <td>{{ doc.prazo_entrega.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            {% if doc.status == 'assinado' %}
+                                {{ doc.data_assinatura.strftime('%d/%m/%Y %H:%M') }}
+                            {% else %}
+                                {{ doc.data_criacao.strftime('%d/%m/%Y %H:%M') }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set situacoes = doc.situacoes|from_json %}
+                            <div>
+                                {% for sit in situacoes[:3] %}
+                                <div class="mb-1">
+                                    <small>• {{ sit.texto }}</small>
+                                    <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-1" style="font-size: 0.7rem;">
+                                        {{ sit.departamento|upper }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                                {% if situacoes|length > 3 %}
+                                <small class="text-muted">+ {{ situacoes|length - 3 }} situação(ões)</small>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if doc.status == 'pendente' %}
+                            <a href="{{ url_for('assinar_documento', id=doc.id) }}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-pen"></i> Assinar
+                            </a>
+                            {% else %}
+                            <a href="{{ url_for('visualizar_documento', id=doc.id) }}" class="btn btn-sm btn-info">
+                                <i class="bi bi-eye"></i> Visualizar
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="mensagemVazia" class="position-absolute top-50 start-50 translate-middle text-center text-muted" style="display: none; width: 100%;">
+            <i class="bi bi-inbox display-1"></i>
+            <p class="mt-3">Nenhum documento encontrado com este filtro</p>
+        </div>
+        
+        {% else %}
+        <div class="d-flex justify-content-center align-items-center h-100 text-muted">
+            <div class="text-center">
+                <i class="bi bi-inbox display-1"></i>
+                <p class="mt-3">Nenhum documento cadastrado ainda</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if todos_docs %}
+<div class="card mt-4">
+    <div class="card-body py-4">
+        <h5 class="card-title mb-4 text-center">Estatísticas</h5>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="text-center p-4 bg-light rounded">
+                    <div class="mb-3">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10" style="width: 80px; height: 80px;">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size: 2.5rem;"></i>
+                        </div>
+                    </div>
+                    <h2 class="mb-2 fw-bold text-success" id="totalAssinados">
+                        {{ todos_docs|selectattr('status', 'equalto', 'assinado')|list|length }}
+                    </h2>
+                    <p class="text-muted mb-0 fw-medium">Documentos Assinados</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="text-center p-4 bg-light rounded">
+                    <div class="mb-3">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-warning bg-opacity-10" style="width: 80px; height: 80px;">
+                            <i class="bi bi-clock-fill text-warning" style="font-size: 2.5rem;"></i>
+                        </div>
+                    </div>
+                    <h2 class="mb-2 fw-bold text-warning" id="totalPendentes">
+                        {{ todos_docs|selectattr('status', 'equalto', 'pendente')|list|length }}
+                    </h2>
+                    <p class="text-muted mb-0 fw-medium">Documentos Pendentes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function filtrarDocumentos() {
+        const filtro = document.querySelector('input[name="filtroStatus"]:checked').value;
+        const linhas = document.querySelectorAll('.documento-linha');
+        const mensagemVazia = document.getElementById('mensagemVazia');
+        const contador = document.getElementById('contadorFiltro');
+        const totalSpan = document.getElementById('totalDocumentos');
+        
+        let visiveisCount = 0;
+        
+        linhas.forEach(linha => {
+            const status = linha.getAttribute('data-status');
+            
+            if (filtro === 'todos' || status === filtro) {
+                linha.style.display = '';
+                visiveisCount++;
+            } else {
+                linha.style.display = 'none';
+            }
+        });
+        
+        // Mostrar/esconder mensagem vazia
+        if (visiveisCount === 0) {
+            mensagemVazia.style.display = 'block';
+        } else {
+            mensagemVazia.style.display = 'none';
+        }
+        
+        // Atualizar contador
+        if (filtro === 'todos') {
+            contador.textContent = `Mostrando todos os documentos (${visiveisCount})`;
+            contador.className = 'badge bg-secondary fs-6 px-3 py-2';
+        } else if (filtro === 'assinado') {
+            contador.textContent = `Mostrando assinados (${visiveisCount})`;
+            contador.className = 'badge bg-success fs-6 px-3 py-2';
+        } else {
+            contador.textContent = `Mostrando pendentes (${visiveisCount})`;
+            contador.className = 'badge bg-warning text-dark fs-6 px-3 py-2';
+        }
+        
+        totalSpan.textContent = `(${visiveisCount})`;
+    }
+</script>
+{% endblock %}

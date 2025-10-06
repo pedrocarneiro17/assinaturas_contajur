@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-plus"></i> Registrar Novo Documento</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="cliente_id" class="form-label">Cliente *</label>
+                            <select class="form-select" id="cliente_id" name="cliente_id" required>
+                                <option value="">Selecione um cliente</option>
+                                {% for cliente in clientes %}
+                                <option value="{{ cliente.id }}">
+                                    {{ cliente.nome }} - {{ cliente.documento }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-3 mb-3">
+                            <label for="competencia" class="form-label">Competência *</label>
+                            <input type="month" class="form-control" id="competencia" name="competencia" required>
+                        </div>
+
+                        <div class="col-md-3 mb-3">
+                            <label for="prazo_entrega" class="form-label">Prazo de Entrega *</label>
+                            <input type="date" class="form-control" id="prazo_entrega" name="prazo_entrega" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="responsavel" class="form-label">Responsável pela Formalização *</label>
+                        <input type="text" class="form-control" id="responsavel" name="responsavel" placeholder="Nome de quem está criando o documento" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Situações e Departamentos *</label>
+                        <p class="text-muted small mb-3">Cada situação deve ter seu departamento específico (Fiscal ou Pessoal)</p>
+                        
+                        <div id="situacoes-container">
+                            <div class="card mb-3 situacao-item shadow-sm">
+                                <div class="card-body">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-7">
+                                            <label class="form-label small text-muted mb-1">Descrição da Situação</label>
+                                            <input type="text" class="form-control" name="situacoes[]" placeholder="Ex: Recibo de entrega de documentos" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label small text-muted mb-1">Departamento</label>
+                                            <select class="form-select" name="departamentos[]" required>
+                                                <option value="fiscal">Fiscal</option>
+                                                <option value="pessoal">Pessoal</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-1 text-center">
+                                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerSituacao(this)" style="display: none;" title="Remover situação">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarSituacao()">
+                            <i class="bi bi-plus-circle"></i> Adicionar Outra Situação
+                        </button>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição Geral (Opcional)</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3" placeholder="Informações adicionais sobre o documento..."></textarea>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Salvar Documento
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function adicionarSituacao() {
+        const container = document.getElementById('situacoes-container');
+        const div = document.createElement('div');
+        div.className = 'card mb-3 situacao-item shadow-sm';
+        div.innerHTML = `
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-7">
+                        <label class="form-label small text-muted mb-1">Descrição da Situação</label>
+                        <input type="text" class="form-control" name="situacoes[]" placeholder="Digite a situação" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted mb-1">Departamento</label>
+                        <select class="form-select" name="departamentos[]" required>
+                            <option value="fiscal">Fiscal</option>
+                            <option value="pessoal">Pessoal</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1 text-center">
+                        <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerSituacao(this)" title="Remover situação">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+        
+        // Mostrar botão de remover no primeiro item se houver mais de um
+        const items = container.querySelectorAll('.situacao-item');
+        if (items.length > 1) {
+            const firstButton = items[0].querySelector('button');
+            if (firstButton) {
+                firstButton.style.display = 'block';
+            }
+        }
+    }
+
+    function removerSituacao(btn) {
+        const container = document.getElementById('situacoes-container');
+        const items = container.querySelectorAll('.situacao-item');
+        
+        if (items.length > 1) {
+            btn.closest('.situacao-item').remove();
+            
+            // Esconder botão de remover se só tiver um item
+            const remainingItems = container.querySelectorAll('.situacao-item');
+            if (remainingItems.length === 1) {
+                const firstButton = remainingItems[0].querySelector('button');
+                if (firstButton) {
+                    firstButton.style.display = 'none';
+                }
+            }
+        }
+    }
+
+    // Definir data mínima para prazo de entrega (hoje)
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('prazo_entrega').min = today;
+</script>
+{% endblock %}

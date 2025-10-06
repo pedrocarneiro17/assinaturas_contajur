@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-speedometer2"></i> Dashboard - Documentos</h2>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('novo_documento') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Novo Documento
+        </a>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Data de Criação</label>
+                <input type="date" class="form-control" name="data_criacao" value="{{ request.args.get('data_criacao', '') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Prazo de Entrega</label>
+                <input type="date" class="form-control" name="prazo_entrega" value="{{ request.args.get('prazo_entrega', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select class="form-select" name="status">
+                    <option value="">Todos</option>
+                    <option value="pendente" {% if request.args.get('status') == 'pendente' %}selected{% endif %}>Pendente</option>
+                    <option value="assinado" {% if request.args.get('status') == 'assinado' %}selected{% endif %}>Assinado</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Cliente</label>
+                <select class="form-select" name="cliente">
+                    <option value="">Todos</option>
+                    {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" {% if request.args.get('cliente') == cliente.id|string %}selected{% endif %}>
+                        {{ cliente.nome }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-filter"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Documentos -->
+<div class="card">
+    <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Documentos ({{ documentos|length }})</h5>
+            <small class="text-muted">Arraste para reorganizar a rota</small>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if documentos %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th width="30"></th>
+                        <th>Cliente</th>
+                        <th>Situações</th>
+                        <th>Prazo</th>
+                        <th>Status</th>
+                        <th>Data Criação</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="sortable-documentos">
+                    {% for doc in documentos %}
+                    <tr class="draggable-item" data-id="{{ doc.id }}">
+                        <td class="text-center">
+                            <i class="bi bi-grip-vertical text-muted"></i>
+                        </td>
+                        <td>
+                            <strong>{{ doc.cliente.nome }}</strong><br>
+                            <small class="text-muted">{{ doc.cliente.documento }}</small>
+                        </td>
+                        <td>
+                            {% set situacoes = doc.situacoes|from_json %}
+                            <div>
+                                {% for sit in situacoes[:2] %}
+                                <div class="mb-1">
+                                    <small>• {{ sit.texto }}</small>
+                                    <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-1" style="font-size: 0.7rem;">
+                                        {{ sit.departamento|upper }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                                {% if situacoes|length > 2 %}
+                                <small class="text-muted">+ {{ situacoes|length - 2 }} mais</small>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>{{ doc.prazo_entrega.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            {% if doc.status == 'assinado' %}
+                            <span class="badge bg-success status-badge">
+                                <i class="bi bi-check-circle"></i> Assinado
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark status-badge">
+                                <i class="bi bi-clock"></i> Pendente
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ doc.data_criacao.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                {% if doc.status == 'pendente' %}
+                                <a href="{{ url_for('assinar_documento', id=doc.id) }}" class="btn btn-primary" title="Coletar Assinatura">
+                                    <i class="bi bi-pen"></i>
+                                </a>
+                                {% else %}
+                                <a href="{{ url_for('visualizar_documento', id=doc.id) }}" class="btn btn-info" title="Visualizar">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% endif %}
+                                <a href="{{ url_for('historico_cliente', id=doc.cliente.id) }}" class="btn btn-secondary" title="Histórico">
+                                    <i class="bi bi-clock-history"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-inbox display-1"></i>
+            <p class="mt-3">Nenhum documento encontrado</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Drag and drop para reordenar
+    const tbody = document.getElementById('sortable-documentos');
+    if (tbody) {
+        Sortable.create(tbody, {
+            animation: 150,
+            handle: '.bi-grip-vertical',
+            onEnd: function(evt) {
+                const ordem = [];
+                document.querySelectorAll('.draggable-item').forEach(item => {
+                    ordem.push(item.dataset.id);
+                });
+                
+                fetch('/api/documentos/reordenar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ ordem: ordem })
+                });
+            }
+        });
+    }
+</script>
+{% endblock %}
