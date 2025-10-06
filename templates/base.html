@@ -137,11 +137,23 @@
             
             .main-content {
                 margin-left: 0;
-                padding: 80px 15px 20px;
+                padding: 20px 15px;
             }
             
             .mobile-menu-toggle {
                 display: block;
+            }
+            
+            /* Overlay escuro quando menu aberto */
+            body.menu-open::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
             }
         }
     </style>
@@ -204,7 +216,9 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
         function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('show');
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('show');
+            document.body.classList.toggle('menu-open');
         }
         
         // Fechar sidebar ao clicar fora (mobile)
@@ -215,9 +229,20 @@
             if (window.innerWidth <= 768 && sidebar && toggle) {
                 if (!sidebar.contains(event.target) && !toggle.contains(event.target)) {
                     sidebar.classList.remove('show');
+                    document.body.classList.remove('menu-open');
                 }
             }
         });
+        
+        // Fechar menu ao clicar em um link (mobile)
+        if (window.innerWidth <= 768) {
+            document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+                link.addEventListener('click', function() {
+                    document.getElementById('sidebar').classList.remove('show');
+                    document.body.classList.remove('menu-open');
+                });
+            });
+        }
     </script>
     {% block extra_js %}{% endblock %}
 </body>
