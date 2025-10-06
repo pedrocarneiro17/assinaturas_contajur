@@ -285,7 +285,23 @@ def init_db():
             db.session.commit()
             print("Usuário padrão criado: admin / admin123")
 
+# Criar tabelas e usuário padrão
+def init_db():
+    with app.app_context():
+        db.create_all()
+        
+        # Criar usuário padrão se não existir
+        if not Usuario.query.filter_by(username='admin').first():
+            user = Usuario(
+                username='admin',
+                password=generate_password_hash('admin123')
+            )
+            db.session.add(user)
+            db.session.commit()
+            print("Usuário padrão criado: admin / admin123")
+
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
