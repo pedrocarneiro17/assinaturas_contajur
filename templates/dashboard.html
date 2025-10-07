@@ -16,25 +16,33 @@
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Data de Criação</label>
-                <input type="date" class="form-control" name="data_criacao" value="{{ request.args.get('data_criacao', '') }}">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Prazo de Entrega</label>
-                <input type="date" class="form-control" name="prazo_entrega" value="{{ request.args.get('prazo_entrega', '') }}">
+            <div class="col-md-2">
+                <label class="form-label small">Criação (De)</label>
+                <input type="date" class="form-control form-control-sm" name="data_criacao_inicio" value="{{ request.args.get('data_criacao_inicio', '') }}">
             </div>
             <div class="col-md-2">
-                <label class="form-label">Status</label>
-                <select class="form-select" name="status">
+                <label class="form-label small">Criação (Até)</label>
+                <input type="date" class="form-control form-control-sm" name="data_criacao_fim" value="{{ request.args.get('data_criacao_fim', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Prazo (De)</label>
+                <input type="date" class="form-control form-control-sm" name="prazo_inicio" value="{{ request.args.get('prazo_inicio', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Prazo (Até)</label>
+                <input type="date" class="form-control form-control-sm" name="prazo_fim" value="{{ request.args.get('prazo_fim', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Status</label>
+                <select class="form-select form-select-sm" name="status">
                     <option value="">Todos</option>
                     <option value="pendente" {% if request.args.get('status') == 'pendente' %}selected{% endif %}>Pendente</option>
                     <option value="assinado" {% if request.args.get('status') == 'assinado' %}selected{% endif %}>Assinado</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Cliente</label>
-                <select class="form-select" name="cliente">
+            <div class="col-md-2">
+                <label class="form-label small">Cliente</label>
+                <select class="form-select form-select-sm" name="cliente">
                     <option value="">Todos</option>
                     {% for cliente in clientes %}
                     <option value="{{ cliente.id }}" {% if request.args.get('cliente') == cliente.id|string %}selected{% endif %}>
@@ -43,10 +51,13 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-1 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-filter"></i>
+            <div class="col-md-12 d-flex justify-content-end gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-filter"></i> Filtrar
                 </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-x-circle"></i> Limpar
+                </a>
             </div>
         </form>
     </div>
@@ -87,7 +98,7 @@
                         </td>
                         <td>
                             {% set situacoes = doc.situacoes|from_json %}
-                            <div>
+                            <div id="situacoes-{{ doc.id }}">
                                 {% for sit in situacoes[:2] %}
                                 <div class="mb-1">
                                     <small>• {{ sit.texto }}</small>
@@ -97,7 +108,21 @@
                                 </div>
                                 {% endfor %}
                                 {% if situacoes|length > 2 %}
-                                <small class="text-muted">+ {{ situacoes|length - 2 }} mais</small>
+                                <div class="situacoes-ocultas-{{ doc.id }}" style="display: none;">
+                                    {% for sit in situacoes[2:] %}
+                                    <div class="mb-1">
+                                        <small>• {{ sit.texto }}</small>
+                                        <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-1" style="font-size: 0.7rem;">
+                                            {{ sit.departamento|upper }}
+                                        </span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <small>
+                                    <a href="#" class="text-primary text-decoration-none" onclick="toggleSituacoes({{ doc.id }}, {{ situacoes|length }}); return false;">
+                                        <span id="toggle-text-{{ doc.id }}">+ {{ situacoes|length - 2 }} mais</span>
+                                    </a>
+                                </small>
                                 {% endif %}
                             </div>
                         </td>
@@ -168,6 +193,20 @@
                 });
             }
         });
+    }
+    
+    // Toggle para mostrar/esconder situações
+    function toggleSituacoes(docId, totalSituacoes) {
+        const situacoesOcultas = document.querySelector('.situacoes-ocultas-' + docId);
+        const toggleText = document.getElementById('toggle-text-' + docId);
+        
+        if (situacoesOcultas.style.display === 'none') {
+            situacoesOcultas.style.display = 'block';
+            toggleText.textContent = '- Mostrar menos';
+        } else {
+            situacoesOcultas.style.display = 'none';
+            toggleText.textContent = '+ ' + (totalSituacoes - 2) + ' mais';
+        }
     }
 </script>
 {% endblock %}

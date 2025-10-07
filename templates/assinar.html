@@ -79,9 +79,12 @@
                         <button type="button" class="btn btn-success btn-lg" onclick="salvarAssinatura()">
                             <i class="bi bi-check-circle"></i> Confirmar Assinatura
                         </button>
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-danger">
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{{ url_for('dashboard') }}'">
                             <i class="bi bi-x-circle"></i> Cancelar
-                        </a>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" onclick="confirmarExclusao()">
+                            <i class="bi bi-trash"></i> Excluir Documento
+                        </button>
                     </div>
                 </div>
 
@@ -192,6 +195,30 @@
             console.error('Erro:', error);
             alert('Erro ao salvar assinatura.');
         });
+    }
+    
+    function confirmarExclusao() {
+        if (confirm('Tem certeza que deseja excluir este documento?\n\nEsta ação não pode ser desfeita.')) {
+            fetch('{{ url_for("deletar_documento", id=documento.id) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.sucesso) {
+                    alert('Documento excluído com sucesso!');
+                    window.location.href = '{{ url_for("dashboard") }}';
+                } else {
+                    alert('Erro ao excluir documento: ' + (data.erro || 'Erro desconhecido'));
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao excluir documento.');
+            });
+        }
     }
 </script>
 {% endblock %}

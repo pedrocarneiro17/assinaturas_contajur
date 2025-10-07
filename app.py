@@ -1,26 +1,43 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-import base64
-import io
 import os
+import json
+import pytz
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'sua-chave-secreta-aqui-mude-em-producao'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///assinaturas.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sua-chave-secreta-aqui-mude-em-producao')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///assinaturas.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# Definir timezone de Brasília
+brasilia_tz = pytz.timezone('America/Sao_Paulo')
+
+# Função auxiliar para pegar hora atual de Brasília
+def agora_brasilia():
+    return datetime.now(brasilia_tz)
+
 # Filtro personalizado para templates
-import json
 @app.template_filter('from_json')
 def from_json_filter(value):
     try:
         return json.loads(value)
     except:
         return []
+
+@app.template_filter('to_brasilia')
+def to_brasilia(dt):
+    if dt is None:
+        return ''
+    # Se já tem timezone, retorna direto
+    if dt.tzinfo is not None:
+        return dt
+    # Se não tem timezone (dados antigos), assume UTC e converte
+    utc_dt = pytz.utc.localize(dt)
+    return utc_dt.astimezone(brasilia_tz)
 
 # Modelos do Banco de Dados
 class Usuario(db.Model):
@@ -31,23 +48,23 @@ class Usuario(db.Model):
 class Cliente(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(200), nullable=False)
-    tipo = db.Column(db.String(2), nullable=False)  # PF ou PJ
+    tipo = db.Column(db.String(2), nullable=False)
     documento = db.Column(db.String(18), unique=True, nullable=False)
-    data_cadastro = db.Column(db.DateTime, default=datetime.utcnow)
+    data_cadastro = db.Column(db.DateTime, default=agora_brasilia)
     
 class Documento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
-    competencia = db.Column(db.String(7), nullable=False)  # MM/YYYY
-    situacoes = db.Column(db.Text, nullable=False)  # JSON string com [{situacao, departamento}]
+    competencia = db.Column(db.String(7), nullable=False)
+    situacoes = db.Column(db.Text, nullable=False)
     descricao = db.Column(db.Text)
     prazo_entrega = db.Column(db.Date, nullable=False)
-    responsavel = db.Column(db.String(200), nullable=False)  # Quem está formalizando
-    status = db.Column(db.String(20), default='pendente')  # pendente/assinado
+    responsavel = db.Column(db.String(200), nullable=False)
+    status = db.Column(db.String(20), default='pendente')
     ordem = db.Column(db.Integer, default=0)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_criacao = db.Column(db.DateTime, default=agora_brasilia)
     data_assinatura = db.Column(db.DateTime)
-    assinatura = db.Column(db.Text)  # Base64 da imagem
+    assinatura = db.Column(db.Text)
     
     cliente = db.relationship('Cliente', backref='documentos')
 
@@ -86,19 +103,27 @@ def dashboard():
         return redirect(url_for('login'))
     
     # Filtros
-    data_criacao = request.args.get('data_criacao')
-    prazo_entrega = request.args.get('prazo_entrega')
+    data_criacao_inicio = request.args.get('data_criacao_inicio')
+    data_criacao_fim = request.args.get('data_criacao_fim')
+    prazo_inicio = request.args.get('prazo_inicio')
+    prazo_fim = request.args.get('prazo_fim')
     status_filtro = request.args.get('status')
     cliente_filtro = request.args.get('cliente')
     
     query = Documento.query
     
-    if data_criacao:
-        data_criacao_dt = datetime.strptime(data_criacao, '%Y-%m-%d')
-        query = query.filter(db.func.date(Documento.data_criacao) == data_criacao_dt.date())
-    if prazo_entrega:
-        prazo_entrega_dt = datetime.strptime(prazo_entrega, '%Y-%m-%d').date()
-        query = query.filter(Documento.prazo_entrega == prazo_entrega_dt)
+    if data_criacao_inicio:
+        dt_inicio = datetime.strptime(data_criacao_inicio, '%Y-%m-%d')
+        query = query.filter(db.func.date(Documento.data_criacao) >= dt_inicio.date())
+    if data_criacao_fim:
+        dt_fim = datetime.strptime(data_criacao_fim, '%Y-%m-%d')
+        query = query.filter(db.func.date(Documento.data_criacao) <= dt_fim.date())
+    if prazo_inicio:
+        prazo_dt_inicio = datetime.strptime(prazo_inicio, '%Y-%m-%d').date()
+        query = query.filter(Documento.prazo_entrega >= prazo_dt_inicio)
+    if prazo_fim:
+        prazo_dt_fim = datetime.strptime(prazo_fim, '%Y-%m-%d').date()
+        query = query.filter(Documento.prazo_entrega <= prazo_dt_fim)
     if status_filtro:
         query = query.filter(Documento.status == status_filtro)
     if cliente_filtro:
@@ -124,7 +149,6 @@ def deletar_cliente(id):
     
     cliente = Cliente.query.get_or_404(id)
     
-    # Verificar se há documentos vinculados
     if cliente.documentos:
         return jsonify({'erro': 'Não é possível excluir cliente com documentos vinculados'}), 400
     
@@ -139,27 +163,19 @@ def novo_cliente():
         return redirect(url_for('login'))
     
     if request.method == 'POST':
-        import re
-        
         nome = request.form.get('nome')
         tipo = request.form.get('tipo')
         documento = request.form.get('documento').replace('.', '').replace('-', '').replace('/', '')
         
-        # Validar CPF/CNPJ
         if tipo == 'PF':
             if len(documento) != 11 or not documento.isdigit():
                 return render_template('cliente_form.html', erro='CPF inválido. Deve conter 11 dígitos.')
-        else:  # PJ
-            if len(documento) != 14 or not documento.isdigit():
-                return render_template('cliente_form.html', erro='CNPJ inválido. Deve conter 14 dígitos.')
-        
-        # Formatar documento
-        if tipo == 'PF':
             documento_formatado = f'{documento[:3]}.{documento[3:6]}.{documento[6:9]}-{documento[9:]}'
         else:
+            if len(documento) != 14 or not documento.isdigit():
+                return render_template('cliente_form.html', erro='CNPJ inválido. Deve conter 14 dígitos.')
             documento_formatado = f'{documento[:2]}.{documento[2:5]}.{documento[5:8]}/{documento[8:12]}-{documento[12:]}'
         
-        # Verificar se já existe
         if Cliente.query.filter_by(documento=documento_formatado).first():
             return render_template('cliente_form.html', erro='Este CPF/CNPJ já está cadastrado.')
         
@@ -177,8 +193,6 @@ def novo_documento():
         return redirect(url_for('login'))
     
     if request.method == 'POST':
-        import json
-        
         cliente_id = request.form.get('cliente_id')
         competencia = request.form.get('competencia')
         situacoes_texto = request.form.getlist('situacoes[]')
@@ -187,7 +201,6 @@ def novo_documento():
         prazo_entrega = datetime.strptime(request.form.get('prazo_entrega'), '%Y-%m-%d').date()
         responsavel = request.form.get('responsavel')
         
-        # Combinar situações com departamentos
         situacoes = []
         for i, sit in enumerate(situacoes_texto):
             if i < len(departamentos):
@@ -231,8 +244,24 @@ def salvar_assinatura(id):
     
     documento.assinatura = assinatura_base64
     documento.status = 'assinado'
-    documento.data_assinatura = datetime.utcnow()
+    documento.data_assinatura = agora_brasilia()
     
+    db.session.commit()
+    
+    return jsonify({'sucesso': True})
+
+@app.route('/documento/<int:id>/deletar', methods=['POST'])
+def deletar_documento(id):
+    if 'user_id' not in session:
+        return jsonify({'erro': 'Não autenticado'}), 401
+    
+    documento = Documento.query.get_or_404(id)
+    
+    # Só permite deletar se estiver pendente (não assinado)
+    if documento.status != 'pendente':
+        return jsonify({'erro': 'Não é possível excluir documentos já assinados'}), 400
+    
+    db.session.delete(documento)
     db.session.commit()
     
     return jsonify({'sucesso': True})
@@ -243,9 +272,8 @@ def historico_cliente(id):
         return redirect(url_for('login'))
     
     cliente = Cliente.query.get_or_404(id)
-    documentos = Documento.query.filter_by(cliente_id=id, status='assinado').order_by(Documento.data_assinatura.desc()).all()
     
-    return render_template('historico.html', cliente=cliente, documentos=documentos)
+    return render_template('historico.html', cliente=cliente)
 
 @app.route('/documento/<int:id>/visualizar')
 def visualizar_documento(id):
@@ -275,7 +303,6 @@ def init_db():
     with app.app_context():
         db.create_all()
         
-        # Criar usuário padrão se não existir
         if not Usuario.query.filter_by(username='admin').first():
             user = Usuario(
                 username='admin',
