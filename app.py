@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import timedelta
 import os
 import json
 import pytz
@@ -23,7 +24,7 @@ brasilia_tz = pytz.timezone('America/Sao_Paulo')
 
 def agora_brasilia():
     utc_now = datetime.now(pytz.utc)
-    return utc_now.astimezone(brasilia_tz)
+    return utc_now - timedelta(hours=3)
 
 # Filtro personalizado para templates
 @app.template_filter('from_json')
