@@ -21,9 +21,9 @@ db = SQLAlchemy(app)
 # Definir timezone de Brasília
 brasilia_tz = pytz.timezone('America/Sao_Paulo')
 
-# Função auxiliar para pegar hora atual de Brasília
 def agora_brasilia():
-    return datetime.now(brasilia_tz)
+    utc_now = datetime.now(pytz.utc)
+    return utc_now.astimezone(brasilia_tz)
 
 # Filtro personalizado para templates
 @app.template_filter('from_json')
