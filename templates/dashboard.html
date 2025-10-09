@@ -15,20 +15,20 @@
 <!-- Filtros -->
 <div class="card mb-4">
     <div class="card-body">
-        <form method="GET" class="row g-3">
-            <div class="col-md-2">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-1">
                 <label class="form-label small">Criação (De)</label>
                 <input type="date" class="form-control form-control-sm" name="data_criacao_inicio" value="{{ request.args.get('data_criacao_inicio', '') }}">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label small">Criação (Até)</label>
                 <input type="date" class="form-control form-control-sm" name="data_criacao_fim" value="{{ request.args.get('data_criacao_fim', '') }}">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label small">Prazo (De)</label>
                 <input type="date" class="form-control form-control-sm" name="prazo_inicio" value="{{ request.args.get('prazo_inicio', '') }}">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label small">Prazo (Até)</label>
                 <input type="date" class="form-control form-control-sm" name="prazo_fim" value="{{ request.args.get('prazo_fim', '') }}">
             </div>
@@ -38,12 +38,24 @@
                     <option value="">Todos</option>
                     <option value="pendente" {% if request.args.get('status') == 'pendente' %}selected{% endif %}>Pendente</option>
                     <option value="assinado" {% if request.args.get('status') == 'assinado' %}selected{% endif %}>Assinado</option>
+                    <option value="coletado" {% if request.args.get('status') == 'coletado' %}selected{% endif %}>Coletado</option>
                 </select>
             </div>
             <div class="col-md-2">
+                <label class="form-label small">Departamento</label>
+                <select class="form-select form-select-sm" name="departamento">
+                    <option value="">Todos</option>
+                    <option value="contabil" {% if request.args.get('departamento') == 'contabil' %}selected{% endif %}>Contábil</option>
+                    <option value="financeiro" {% if request.args.get('departamento') == 'financeiro' %}selected{% endif %}>Financeiro</option>
+                    <option value="fiscal" {% if request.args.get('departamento') == 'fiscal' %}selected{% endif %}>Fiscal</option>
+                    <option value="malote" {% if request.args.get('departamento') == 'malote' %}selected{% endif %}>Malote</option>
+                    <option value="pessoal" {% if request.args.get('departamento') == 'pessoal' %}selected{% endif %}>Pessoal</option>
+                </select>
+            </div>
+            <div class="col-md-3">
                 <label class="form-label small">Cliente</label>
                 <select class="form-select form-select-sm" name="cliente">
-                    <option value="">Todos</option>
+                    <option value="">Todos os clientes</option>
                     {% for cliente in clientes %}
                     <option value="{{ cliente.id }}" {% if request.args.get('cliente') == cliente.id|string %}selected{% endif %}>
                         {{ cliente.nome }}
@@ -51,12 +63,12 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-12 d-flex justify-content-end gap-2">
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="bi bi-filter"></i> Filtrar
+            <div class="col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-primary btn-sm flex-fill" title="Filtrar">
+                    <i class="bi bi-filter"></i>
                 </button>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
-                    <i class="bi bi-x-circle"></i> Limpar
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm flex-fill" title="Limpar">
+                    <i class="bi bi-x-circle"></i>
                 </a>
             </div>
         </form>
@@ -97,30 +109,30 @@
                             <small class="text-muted">{{ doc.cliente.documento }}</small>
                         </td>
                         <td>
-                            {% set situacoes = doc.situacoes|from_json %}
+                            {% set situacoes_ordenadas = doc.situacoes_list|sort(attribute='ordem') %}
                             <div id="situacoes-{{ doc.id }}">
-                                {% for sit in situacoes[:2] %}
+                                {% for sit in situacoes_ordenadas[:2] %}
                                 <div class="mb-1">
                                     <small>• {{ sit.texto }}</small>
-                                    <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-1" style="font-size: 0.7rem;">
+                                    <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% elif sit.departamento == 'pessoal' %}secondary{% elif sit.departamento == 'contabil' %}warning text-dark{% elif sit.departamento == 'financeiro' %}success{% elif sit.departamento == 'malote' %}danger{% else %}dark{% endif %} ms-1" style="font-size: 0.7rem;">
                                         {{ sit.departamento|upper }}
                                     </span>
                                 </div>
                                 {% endfor %}
-                                {% if situacoes|length > 2 %}
+                                {% if doc.situacoes_list|length > 2 %}
                                 <div class="situacoes-ocultas-{{ doc.id }}" style="display: none;">
-                                    {% for sit in situacoes[2:] %}
+                                    {% for sit in situacoes_ordenadas[2:] %}
                                     <div class="mb-1">
                                         <small>• {{ sit.texto }}</small>
-                                        <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-1" style="font-size: 0.7rem;">
+                                        <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% elif sit.departamento == 'pessoal' %}secondary{% elif sit.departamento == 'contabil' %}warning text-dark{% elif sit.departamento == 'financeiro' %}success{% elif sit.departamento == 'malote' %}danger{% else %}dark{% endif %} ms-1" style="font-size: 0.7rem;">
                                             {{ sit.departamento|upper }}
                                         </span>
                                     </div>
                                     {% endfor %}
                                 </div>
                                 <small>
-                                    <a href="#" class="text-primary text-decoration-none" onclick="toggleSituacoes({{ doc.id }}, {{ situacoes|length }}); return false;">
-                                        <span id="toggle-text-{{ doc.id }}">+ {{ situacoes|length - 2 }} mais</span>
+                                    <a href="#" class="text-primary text-decoration-none" onclick="toggleSituacoes({{ doc.id }}, {{ doc.situacoes_list|length }}); return false;">
+                                        <span id="toggle-text-{{ doc.id }}">+ {{ doc.situacoes_list|length - 2 }} mais</span>
                                     </a>
                                 </small>
                                 {% endif %}
@@ -130,7 +142,7 @@
                         <td>
                             {% if doc.status == 'assinado' %}
                             <span class="badge bg-success status-badge">
-                                <i class="bi bi-check-circle"></i> Assinado
+                                <i class="bi bi-check-circle"></i> {% if doc.eh_malote %}Coletado{% else %}Assinado{% endif %}
                             </span>
                             {% else %}
                             <span class="badge bg-warning text-dark status-badge">
@@ -142,7 +154,7 @@
                         <td>
                             <div class="btn-group btn-group-sm">
                                 {% if doc.status == 'pendente' %}
-                                <a href="{{ url_for('assinar_documento', id=doc.id) }}" class="btn btn-primary" title="Coletar Assinatura">
+                                <a href="{{ url_for('assinar_documento', id=doc.id) }}" class="btn btn-primary" title="{% if doc.eh_malote %}Confirmar Malote{% else %}Coletar Assinatura{% endif %}">
                                     <i class="bi bi-pen"></i>
                                 </a>
                                 {% else %}
@@ -172,6 +184,55 @@
 
 {% block extra_js %}
 <script>
+    // Salvar filtros no localStorage ao submeter o formulário
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const formData = new FormData(this);
+        const filtros = {};
+        
+        formData.forEach((value, key) => {
+            if (value) {
+                filtros[key] = value;
+            }
+        });
+        
+        localStorage.setItem('dashboard_filtros', JSON.stringify(filtros));
+    });
+    
+    // Carregar filtros salvos ao abrir a página (apenas se não houver filtros na URL)
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const temFiltrosNaURL = Array.from(urlParams.values()).some(v => v);
+        
+        // Se não tem filtros na URL, carregar do localStorage
+        if (!temFiltrosNaURL) {
+            const filtrosSalvos = localStorage.getItem('dashboard_filtros');
+            
+            if (filtrosSalvos) {
+                const filtros = JSON.parse(filtrosSalvos);
+                let temFiltros = false;
+                
+                // Preencher os campos do formulário
+                Object.entries(filtros).forEach(([key, value]) => {
+                    const campo = document.querySelector(`[name="${key}"]`);
+                    if (campo) {
+                        campo.value = value;
+                        temFiltros = true;
+                    }
+                });
+                
+                // Se preencheu algum filtro, submeter automaticamente
+                if (temFiltros) {
+                    document.querySelector('form').submit();
+                }
+            }
+        }
+    });
+    
+    // Limpar localStorage ao clicar no botão Limpar
+    document.querySelector('a.btn-secondary').addEventListener('click', function() {
+        localStorage.removeItem('dashboard_filtros');
+    });
+
     // Drag and drop para reordenar
     const tbody = document.getElementById('sortable-documentos');
     if (tbody) {

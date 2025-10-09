@@ -5,6 +5,97 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-10">
+        <!-- Verificar se é documento de malote -->
+        {% if documento.eh_malote %}
+        <div class="card shadow-lg border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-box-seam"></i> Confirmar Coleta de Malote</h5>
+            </div>
+            <div class="card-body">
+                <div class="border rounded p-4 mb-4 bg-light">
+                    <h5 class="text-danger mb-3">DOCUMENTOS PARA COLETA NO CLIENTE</h5>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <strong>Cliente:</strong><br>
+                            <span class="fs-5">{{ documento.cliente.nome }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>{{ 'CPF' if documento.cliente.tipo == 'PF' else 'CNPJ' }}:</strong><br>
+                            <span class="fs-5">{{ documento.cliente.documento }}</span>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <strong>Competência:</strong><br>
+                            <span class="fs-6">{{ documento.competencia }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Prazo de Entrega:</strong><br>
+                            <span class="fs-6">{{ documento.prazo_entrega.strftime('%d/%m/%Y') }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Responsável:</strong><br>
+                            <span class="fs-6">{{ documento.responsavel }}</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Situações:</strong>
+                        <ul class="mt-2">
+                            {% for sit in documento.situacoes_list %}
+                            <li>
+                                {{ sit.texto }}
+                                <span class="badge bg-danger ms-2">
+                                    {{ sit.departamento|upper }}
+                                </span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    {% if documento.descricao %}
+                    <div>
+                        <strong>Descrição:</strong><br>
+                        <p class="mb-0 mt-2">{{ documento.descricao }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Área de Confirmação -->
+                <div class="text-center mb-4">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> <strong>Importante!</strong><br>
+                        Documentos de Malote são aqueles que você irá <strong>coletar/buscar no cliente</strong>. Clique em "Confirmar" para registrar a coleta.
+                    </div>
+
+                    <div class="p-4 bg-light border rounded mb-4">
+                        <i class="bi bi-box-seam text-danger" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-danger">Coleta de Documentos</h5>
+                        <p class="text-muted mb-0">Este malote não requer assinatura do cliente</p>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-center mb-3">
+                        <button type="button" class="btn btn-success btn-lg" onclick="confirmarMalote()">
+                            <i class="bi bi-check-circle"></i> Confirmar Coleta
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{{ url_for('dashboard') }}'">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </button>
+                    </div>
+                    
+                    <!-- Botão de excluir separado -->
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmarExclusao()">
+                            <i class="bi bi-trash"></i> Excluir Documento
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Documento normal que precisa de assinatura -->
         <div class="card shadow-lg">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0"><i class="bi bi-pen"></i> Documento para Assinatura</h5>
@@ -40,14 +131,13 @@
                         </div>
                     </div>
 
-                    {% set situacoes = documento.situacoes|from_json %}
                     <div class="mb-3">
                         <strong>Situações:</strong>
                         <ul class="mt-2">
-                            {% for sit in situacoes %}
+                            {% for sit in documento.situacoes_list %}
                             <li>
                                 {{ sit.texto }}
-                                <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-2">
+                                <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% elif sit.departamento == 'pessoal' %}secondary{% elif sit.departamento == 'contabil' %}warning text-dark{% elif sit.departamento == 'financeiro' %}success{% elif sit.departamento == 'malote' %}danger{% else %}dark{% endif %} ms-2">
                                     {{ sit.departamento|upper }}
                                 </span>
                             </li>
@@ -72,7 +162,7 @@
                         <canvas id="signature-pad" class="signature-canvas" width="700" height="300"></canvas>
                     </div>
 
-                    <div class="d-flex gap-2 justify-content-center">
+                    <div class="d-flex gap-2 justify-content-center mb-3">
                         <button type="button" class="btn btn-outline-secondary" onclick="limparAssinatura()">
                             <i class="bi bi-eraser"></i> Limpar
                         </button>
@@ -82,7 +172,11 @@
                         <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{{ url_for('dashboard') }}'">
                             <i class="bi bi-x-circle"></i> Cancelar
                         </button>
-                        <button type="button" class="btn btn-outline-danger" onclick="confirmarExclusao()">
+                    </div>
+                    
+                    <!-- Botão de excluir separado -->
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmarExclusao()">
                             <i class="bi bi-trash"></i> Excluir Documento
                         </button>
                     </div>
@@ -94,12 +188,64 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    {% if documento.eh_malote %}
+    // Função para confirmar malote
+    function confirmarMalote() {
+        if (confirm('Confirmar que os documentos foram coletados no cliente?')) {
+            fetch('{{ url_for("salvar_assinatura", id=documento.id) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ assinatura: null, malote: true })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.sucesso) {
+                    alert('Coleta de malote confirmada com sucesso!');
+                    window.location.href = '{{ url_for("dashboard") }}';
+                } else {
+                    alert('Erro ao confirmar coleta.');
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao confirmar coleta.');
+            });
+        }
+    }
+    
+    function confirmarExclusao() {
+        if (confirm('Tem certeza que deseja excluir este documento?\n\nEsta ação não pode ser desfeita.')) {
+            fetch('{{ url_for("deletar_documento", id=documento.id) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.sucesso) {
+                    alert('Documento excluído com sucesso!');
+                    window.location.href = '{{ url_for("dashboard") }}';
+                } else {
+                    alert('Erro ao excluir documento: ' + (data.erro || 'Erro desconhecido'));
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao excluir documento.');
+            });
+        }
+    }
+    {% else %}
     const canvas = document.getElementById('signature-pad');
     const ctx = canvas.getContext('2d');
     let desenhando = false;
@@ -220,5 +366,6 @@
             });
         }
     }
+    {% endif %}
 </script>
 {% endblock %}

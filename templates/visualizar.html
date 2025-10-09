@@ -6,8 +6,14 @@
 <div class="row justify-content-center">
     <div class="col-md-10">
         <div class="card shadow-lg">
-            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documento Assinado</h5>
+            <div class="card-header {% if documento.eh_malote %}bg-danger{% else %}bg-success{% endif %} text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    {% if documento.eh_malote %}
+                    <i class="bi bi-box-seam"></i> Documento de Malote
+                    {% else %}
+                    <i class="bi bi-file-earmark-check"></i> Documento Assinado
+                    {% endif %}
+                </h5>
                 <button onclick="window.print()" class="btn btn-light btn-sm">
                     <i class="bi bi-printer"></i> Imprimir
                 </button>
@@ -15,7 +21,13 @@
             <div class="card-body" id="documento-impressao">
                 <!-- Cabeçalho -->
                 <div class="text-center mb-4">
-                    <h4 class="text-primary">COMPROVANTE DE RECEBIMENTO DE DOCUMENTOS</h4>
+                    <h4 class="text-primary">
+                        {% if documento.eh_malote %}
+                        COMPROVANTE DE REGISTRO - MALOTE
+                        {% else %}
+                        COMPROVANTE DE RECEBIMENTO DE DOCUMENTOS
+                        {% endif %}
+                    </h4>
                     <hr>
                 </div>
 
@@ -52,14 +64,13 @@
                         </div>
                     </div>
 
-                    {% set situacoes = documento.situacoes|from_json %}
                     <div class="mb-3">
                         <strong>Situações Documentadas:</strong>
                         <ul class="mt-2">
-                            {% for sit in situacoes %}
+                            {% for sit in documento.situacoes_list|sort(attribute='ordem') %}
                             <li>
                                 {{ sit.texto }}
-                                <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-2">
+                                <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% elif sit.departamento == 'pessoal' %}secondary{% elif sit.departamento == 'contabil' %}warning text-dark{% elif sit.departamento == 'financeiro' %}success{% elif sit.departamento == 'malote' %}danger{% else %}dark{% endif %} ms-2">
                                     {{ sit.departamento|upper }}
                                 </span>
                             </li>
@@ -75,6 +86,22 @@
                     {% endif %}
                 </div>
 
+                <!-- Assinatura ou Malote -->
+                {% if documento.eh_malote %}
+                <div class="mb-4">
+                    <h5 class="bg-light p-2 border-start border-danger border-4">CONFIRMAÇÃO DE COLETA - MALOTE</h5>
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Atenção:</strong> Este documento foi registrado como <strong>Malote</strong> para coleta de documentos no cliente.
+                        A confirmação foi realizada em <strong>{{ documento.data_assinatura.strftime('%d/%m/%Y às %H:%M') if documento.data_assinatura else documento.data_criacao.strftime('%d/%m/%Y às %H:%M') }}</strong>.
+                    </div>
+                    <div class="text-center mt-4 p-4 bg-light border rounded">
+                        <i class="bi bi-box-seam text-danger" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-danger">Coleta de Documentos - Malote</h5>
+                        <p class="text-muted mb-0">Documentos coletados no cliente</p>
+                    </div>
+                </div>
+                {% else %}
                 <!-- Assinatura -->
                 <div class="mb-4">
                     <h5 class="bg-light p-2 border-start border-success border-4">ASSINATURA</h5>
@@ -89,6 +116,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Informações de Registro -->
                 <div class="mt-4 p-3 bg-light border rounded">
@@ -97,7 +125,11 @@
                             <strong>Data de Criação:</strong> {{ documento.data_criacao.strftime('%d/%m/%Y às %H:%M') }}
                         </div>
                         <div class="col-md-6">
-                            <strong>Data da Assinatura:</strong> {{ documento.data_assinatura.strftime('%d/%m/%Y às %H:%M') }}
+                            {% if documento.eh_malote %}
+                            <strong>Status:</strong> <span class="badge bg-danger">Malote - Sem assinatura</span>
+                            {% else %}
+                            <strong>Data da Assinatura:</strong> {{ documento.data_assinatura.strftime('%d/%m/%Y às %H:%M') if documento.data_assinatura else 'N/A' }}
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -185,12 +217,20 @@
             padding: 5px !important;
             margin-bottom: 5px !important;
         }
+        .alert {
+            padding: 8px !important;
+            margin: 5px 0 !important;
+        }
         p, div, strong {
             font-size: 0.9rem !important;
             line-height: 1.2 !important;
         }
         .fs-5 {
             font-size: 0.95rem !important;
+        }
+        .badge {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
         @page {
             margin: 0.8cm;

@@ -40,7 +40,10 @@
 
                     <div class="mb-4">
                         <label class="form-label fw-bold">Situações e Departamentos *</label>
-                        <p class="text-muted small mb-3">Cada situação deve ter seu departamento específico (Fiscal ou Pessoal)</p>
+                        <p class="text-muted small mb-3">
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>Importante:</strong> Se a primeira situação for <span class="badge bg-danger">Malote</span>, todas as seguintes também serão automaticamente Malote.
+                        </p>
                         
                         <div id="situacoes-container">
                             <div class="card mb-3 situacao-item shadow-sm">
@@ -52,11 +55,13 @@
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label small text-muted mb-1">Departamento</label>
-                                            <select class="form-select" name="departamentos[]" required>
+                                            <select class="form-select departamento-select" name="departamentos[]" required onchange="verificarDepartamento()">
                                                 <option value="">Selecione...</option>
-                                                <option value="fiscal">Fiscal</option>
-                                                <option value="pessoal">Pessoal</option>
                                                 <option value="contabil">Contábil</option>
+                                                <option value="financeiro">Financeiro</option>
+                                                <option value="fiscal">Fiscal</option>
+                                                <option value="malote">Malote</option>
+                                                <option value="pessoal">Pessoal</option>                                             
                                             </select>
                                         </div>
                                         <div class="col-md-1 text-center">
@@ -69,7 +74,7 @@
                             </div>
                         </div>
                         
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarSituacao()">
+                        <button type="button" id="btn-adicionar-situacao" class="btn btn-sm btn-outline-primary" onclick="adicionarSituacao()">
                             <i class="bi bi-plus-circle"></i> Adicionar Outra Situação
                         </button>
                     </div>
@@ -98,10 +103,105 @@
 
 {% block extra_js %}
 <script>
+    function verificarDepartamento() {
+        const primeiroSelect = document.querySelector('select[name="departamentos[]"]');
+        if (!primeiroSelect) return;
+        
+        const primeiroValor = primeiroSelect.value;
+        const todosSelects = document.querySelectorAll('select[name="departamentos[]"]');
+        const btnAdicionar = document.getElementById('btn-adicionar-situacao');
+        
+        // Se o primeiro é Malote
+        if (primeiroValor === 'malote') {
+            // PERMITIR adicionar mais situações (não desabilitar o botão)
+            btnAdicionar.disabled = false;
+            btnAdicionar.classList.remove('disabled');
+            btnAdicionar.title = '';
+            
+            // Forçar todos os selects seguintes a serem Malote
+            todosSelects.forEach((select, index) => {
+                if (index === 0) return; // Pula o primeiro
+                
+                // Auto-selecionar malote
+                select.value = 'malote';
+                
+                // Desabilitar o select (não pode mudar)
+                select.disabled = true;
+                select.style.backgroundColor = '#e9ecef';
+            });
+            
+        } else if (primeiroValor !== '' && primeiroValor !== 'malote') {
+            // Se primeiro não é malote, habilita botão de adicionar
+            btnAdicionar.disabled = false;
+            btnAdicionar.classList.remove('disabled');
+            btnAdicionar.title = '';
+            
+            // Bloqueia opção Malote nos selects seguintes
+            todosSelects.forEach((select, index) => {
+                if (index === 0) return; // Pula o primeiro
+                
+                // Habilitar o select
+                select.disabled = false;
+                select.style.backgroundColor = '';
+                
+                const opcoes = select.querySelectorAll('option');
+                opcoes.forEach(option => {
+                    if (option.value === 'malote') {
+                        option.disabled = true;
+                    } else {
+                        option.disabled = false;
+                    }
+                });
+                
+                // Se estava em malote, reseta
+                if (select.value === 'malote') {
+                    select.value = '';
+                }
+            });
+            
+        } else {
+            // Se primeiro está vazio, libera tudo
+            btnAdicionar.disabled = false;
+            btnAdicionar.classList.remove('disabled');
+            btnAdicionar.title = '';
+            
+            todosSelects.forEach((select, index) => {
+                if (index === 0) return;
+                
+                // Habilitar o select
+                select.disabled = false;
+                select.style.backgroundColor = '';
+                
+                const opcoes = select.querySelectorAll('option');
+                opcoes.forEach(option => {
+                    option.disabled = false;
+                });
+            });
+        }
+    }
+
     function adicionarSituacao() {
+        const primeiroSelect = document.querySelector('select[name="departamentos[]"]');
         const container = document.getElementById('situacoes-container');
+        const primeiroValor = primeiroSelect ? primeiroSelect.value : '';
+        
         const div = document.createElement('div');
         div.className = 'card mb-3 situacao-item shadow-sm';
+        
+        // Se o primeiro é malote, criar select desabilitado com malote selecionado
+        const selectHTML = primeiroValor === 'malote' 
+            ? `<select class="form-select departamento-select" name="departamentos[]" required disabled style="background-color: #e9ecef;">
+                    <option value="malote" selected>Malote</option>
+               </select>`
+            : `<select class="form-select departamento-select" name="departamentos[]" required onchange="verificarDepartamento()">
+                    <option value="">Selecione...</option>
+                    <option value="contabil">Contábil</option>
+                    <option value="financeiro">Financeiro</option>
+                    <option value="fiscal">Fiscal</option>
+                    <option value="malote">Malote</option>
+                    <option value="pessoal">Pessoal</option>
+               </select>`;
+        
         div.innerHTML = `
             <div class="card-body">
                 <div class="row g-2 align-items-end">
@@ -111,12 +211,7 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small text-muted mb-1">Departamento</label>
-                        <select class="form-select" name="departamentos[]" required>
-                            <option value="">Selecione...</option>
-                            <option value="fiscal">Fiscal</option>
-                            <option value="pessoal">Pessoal</option>
-                            <option value="contabil">Contábil</option>
-                        </select>
+                        ${selectHTML}
                     </div>
                     <div class="col-md-1 text-center">
                         <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerSituacao(this)" title="Remover situação">
@@ -136,6 +231,9 @@
                 firstButton.style.display = 'block';
             }
         }
+        
+        // Aplicar regras ao novo select
+        verificarDepartamento();
     }
 
     function removerSituacao(btn) {
@@ -153,11 +251,22 @@
                     firstButton.style.display = 'none';
                 }
             }
+            
+            // Reaplica as regras após remover
+            verificarDepartamento();
         }
     }
 
     // Definir data mínima para prazo de entrega (hoje)
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('prazo_entrega').min = today;
+    
+    // Adicionar evento ao primeiro select quando a página carregar
+    document.addEventListener('DOMContentLoaded', function() {
+        const primeiroSelect = document.querySelector('select[name="departamentos[]"]');
+        if (primeiroSelect) {
+            primeiroSelect.addEventListener('change', verificarDepartamento);
+        }
+    });
 </script>
 {% endblock %}

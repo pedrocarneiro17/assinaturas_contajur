@@ -56,7 +56,6 @@ class Documento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
     competencia = db.Column(db.String(7), nullable=False)
-    situacoes = db.Column(db.Text, nullable=False)
     descricao = db.Column(db.Text)
     prazo_entrega = db.Column(db.Date, nullable=False)
     responsavel = db.Column(db.String(200), nullable=False)
@@ -65,8 +64,19 @@ class Documento(db.Model):
     data_criacao = db.Column(db.DateTime, default=agora_brasilia)
     data_assinatura = db.Column(db.DateTime)
     assinatura = db.Column(db.Text)
+    eh_malote = db.Column(db.Boolean, default=False)
     
     cliente = db.relationship('Cliente', backref='documentos')
+    # situacoes_list já está definido no relacionamento da classe Situacao
+    
+class Situacao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    documento_id = db.Column(db.Integer, db.ForeignKey('documento.id'), nullable=False)
+    texto = db.Column(db.String(500), nullable=False)
+    departamento = db.Column(db.String(20), nullable=False)
+    ordem = db.Column(db.Integer, default=0)
+    
+    documento = db.relationship('Documento', backref=db.backref('situacoes_list', lazy=True, cascade='all, delete-orphan'))
 
 # Rotas
 @app.route('/')
@@ -109,8 +119,13 @@ def dashboard():
     prazo_fim = request.args.get('prazo_fim')
     status_filtro = request.args.get('status')
     cliente_filtro = request.args.get('cliente')
+    departamento_filtro = request.args.get('departamento')
     
     query = Documento.query
+    
+    # Filtro por departamento (usando join com Situacao)
+    if departamento_filtro:
+        query = query.join(Situacao).filter(Situacao.departamento == departamento_filtro)
     
     if data_criacao_inicio:
         dt_inicio = datetime.strptime(data_criacao_inicio, '%Y-%m-%d')
@@ -124,8 +139,19 @@ def dashboard():
     if prazo_fim:
         prazo_dt_fim = datetime.strptime(prazo_fim, '%Y-%m-%d').date()
         query = query.filter(Documento.prazo_entrega <= prazo_dt_fim)
-    if status_filtro:
-        query = query.filter(Documento.status == status_filtro)
+    
+    # Filtro de status especial para "coletado"
+    if status_filtro == 'coletado':
+        # Coletado = Malote + Assinado
+        query = query.filter(Documento.eh_malote == True, Documento.status == 'assinado')
+    elif status_filtro:
+        # Pendente ou Assinado normal
+        if status_filtro == 'assinado':
+            # Assinado mas NÃO malote (para separar de "coletado")
+            query = query.filter(Documento.status == 'assinado', Documento.eh_malote == False)
+        else:
+            query = query.filter(Documento.status == status_filtro)
+    
     if cliente_filtro:
         query = query.filter(Documento.cliente_id == int(cliente_filtro))
     
@@ -201,24 +227,34 @@ def novo_documento():
         prazo_entrega = datetime.strptime(request.form.get('prazo_entrega'), '%Y-%m-%d').date()
         responsavel = request.form.get('responsavel')
         
-        situacoes = []
-        for i, sit in enumerate(situacoes_texto):
-            if i < len(departamentos):
-                situacoes.append({
-                    'texto': sit,
-                    'departamento': departamentos[i]
-                })
+        # Verificar se todas as situações são malote
+        eh_malote = all(dep == 'malote' for dep in departamentos if dep)
         
+        # Criar documento
         documento = Documento(
             cliente_id=cliente_id,
             competencia=competencia,
-            situacoes=json.dumps(situacoes),
             descricao=descricao,
             prazo_entrega=prazo_entrega,
-            responsavel=responsavel
+            responsavel=responsavel,
+            eh_malote=eh_malote,
+            status= 'pendente'
         )
         
         db.session.add(documento)
+        db.session.flush()  # Para pegar o ID do documento
+        
+        # Criar situações
+        for i, texto in enumerate(situacoes_texto):
+            if i < len(departamentos):
+                situacao = Situacao(
+                    documento_id=documento.id,
+                    texto=texto,
+                    departamento=departamentos[i],
+                    ordem=i
+                )
+                db.session.add(situacao)
+        
         db.session.commit()
         
         return redirect(url_for('dashboard'))
@@ -240,11 +276,20 @@ def salvar_assinatura(id):
         return jsonify({'erro': 'Não autenticado'}), 401
     
     documento = Documento.query.get_or_404(id)
-    assinatura_base64 = request.json.get('assinatura')
     
-    documento.assinatura = assinatura_base64
-    documento.status = 'assinado'
-    documento.data_assinatura = agora_brasilia()
+    # Verificar se é confirmação de malote
+    is_malote = request.json.get('malote', False)
+    
+    if is_malote or documento.eh_malote:
+        # Malote: apenas marca como assinado sem salvar imagem
+        documento.status = 'assinado'
+        documento.data_assinatura = agora_brasilia()
+    else:
+        # Documento normal: salva assinatura
+        assinatura_base64 = request.json.get('assinatura')
+        documento.assinatura = assinatura_base64
+        documento.status = 'assinado'
+        documento.data_assinatura = agora_brasilia()
     
     db.session.commit()
     
@@ -303,14 +348,23 @@ def init_db():
     with app.app_context():
         db.create_all()
         
-        if not Usuario.query.filter_by(username='admin').first():
+        # Pegar credenciais do ambiente (Railway)
+        admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        
+        # Verificar se usuário já existe
+        existing_user = Usuario.query.filter_by(username=admin_username).first()
+        
+        if not existing_user:
             user = Usuario(
-                username='admin',
-                password=generate_password_hash('admin123')
+                username=admin_username,
+                password=generate_password_hash(admin_password)
             )
             db.session.add(user)
             db.session.commit()
-            print("Usuário padrão criado: admin / admin123")
+            print(f"✅ Usuário padrão criado: {admin_username}")
+        else:
+            print(f"ℹ️  Usuário '{admin_username}' já existe")
 
 init_db()
 

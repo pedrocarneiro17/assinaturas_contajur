@@ -45,6 +45,11 @@
                     <label class="btn btn-outline-warning" for="filtroPendentes">
                         <i class="bi bi-clock"></i> Pendentes
                     </label>
+                    
+                    <input type="radio" class="btn-check" name="filtroStatus" id="filtroMalote" value="malote" onchange="filtrarDocumentos()">
+                    <label class="btn btn-outline-danger" for="filtroMalote">
+                        <i class="bi bi-box-seam"></i> Malote
+                    </label>
                 </div>
             </div>
             <span class="badge bg-secondary fs-6 px-3 py-2" id="contadorFiltro">Mostrando todos os documentos</span>
@@ -73,9 +78,13 @@
                 </thead>
                 <tbody id="tabelaDocumentos">
                     {% for doc in todos_docs %}
-                    <tr data-status="{{ doc.status }}" class="documento-linha">
+                    <tr data-status="{{ 'malote' if doc.eh_malote else doc.status }}" class="documento-linha">
                         <td>
-                            {% if doc.status == 'assinado' %}
+                            {% if doc.eh_malote %}
+                            <span class="badge bg-danger">
+                                <i class="bi bi-box-seam"></i> Malote
+                            </span>
+                            {% elif doc.status == 'assinado' %}
                             <span class="badge bg-success">
                                 <i class="bi bi-check-circle"></i> Assinado
                             </span>
@@ -89,29 +98,29 @@
                         <td>{{ doc.prazo_entrega.strftime('%d/%m/%Y') }}</td>
                         <td>
                             {% if doc.status == 'assinado' %}
-                                {{ doc.data_assinatura.strftime('%d/%m/%Y %H:%M') }}
+                                {{ doc.data_assinatura.strftime('%d/%m/%Y %H:%M') if doc.data_assinatura else doc.data_criacao.strftime('%d/%m/%Y %H:%M') }}
                             {% else %}
                                 {{ doc.data_criacao.strftime('%d/%m/%Y %H:%M') }}
                             {% endif %}
                         </td>
                         <td>
-                            {% set situacoes = doc.situacoes|from_json %}
+                            {% set situacoes_ordenadas = doc.situacoes_list|sort(attribute='ordem') %}
                             <div>
-                                {% for sit in situacoes[:3] %}
+                                {% for sit in situacoes_ordenadas[:3] %}
                                 <div class="mb-1">
                                     <small>• {{ sit.texto }}</small>
-                                    <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% else %}secondary{% endif %} ms-1" style="font-size: 0.7rem;">
+                                    <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% elif sit.departamento == 'pessoal' %}secondary{% elif sit.departamento == 'contabil' %}warning text-dark{% elif sit.departamento == 'financeiro' %}success{% elif sit.departamento == 'malote' %}danger{% else %}dark{% endif %} ms-1" style="font-size: 0.7rem;">
                                         {{ sit.departamento|upper }}
                                     </span>
                                 </div>
                                 {% endfor %}
-                                {% if situacoes|length > 3 %}
-                                <small class="text-muted">+ {{ situacoes|length - 3 }} situação(ões)</small>
+                                {% if doc.situacoes_list|length > 3 %}
+                                <small class="text-muted">+ {{ doc.situacoes_list|length - 3 }} situação(ões)</small>
                                 {% endif %}
                             </div>
                         </td>
                         <td>
-                            {% if doc.status == 'pendente' %}
+                            {% if doc.status == 'pendente' and not doc.eh_malote %}
                             <a href="{{ url_for('assinar_documento', id=doc.id) }}" class="btn btn-sm btn-primary">
                                 <i class="bi bi-pen"></i> Assinar
                             </a>
@@ -148,7 +157,7 @@
     <div class="card-body py-4">
         <h5 class="card-title mb-4 text-center">Estatísticas</h5>
         <div class="row g-4">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="text-center p-4 bg-light rounded">
                     <div class="mb-3">
                         <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10" style="width: 80px; height: 80px;">
@@ -156,12 +165,12 @@
                         </div>
                     </div>
                     <h2 class="mb-2 fw-bold text-success" id="totalAssinados">
-                        {{ todos_docs|selectattr('status', 'equalto', 'assinado')|list|length }}
+                        {{ todos_docs|rejectattr('eh_malote')|selectattr('status', 'equalto', 'assinado')|list|length }}
                     </h2>
-                    <p class="text-muted mb-0 fw-medium">Documentos Assinados</p>
+                    <p class="text-muted mb-0 fw-medium">Assinados</p>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="text-center p-4 bg-light rounded">
                     <div class="mb-3">
                         <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-warning bg-opacity-10" style="width: 80px; height: 80px;">
@@ -171,7 +180,20 @@
                     <h2 class="mb-2 fw-bold text-warning" id="totalPendentes">
                         {{ todos_docs|selectattr('status', 'equalto', 'pendente')|list|length }}
                     </h2>
-                    <p class="text-muted mb-0 fw-medium">Documentos Pendentes</p>
+                    <p class="text-muted mb-0 fw-medium">Pendentes</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center p-4 bg-light rounded">
+                    <div class="mb-3">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10" style="width: 80px; height: 80px;">
+                            <i class="bi bi-box-seam-fill text-danger" style="font-size: 2.5rem;"></i>
+                        </div>
+                    </div>
+                    <h2 class="mb-2 fw-bold text-danger" id="totalMalote">
+                        {{ todos_docs|selectattr('eh_malote')|list|length }}
+                    </h2>
+                    <p class="text-muted mb-0 fw-medium">Malote</p>
                 </div>
             </div>
         </div>
@@ -216,9 +238,12 @@
         } else if (filtro === 'assinado') {
             contador.textContent = `Mostrando assinados (${visiveisCount})`;
             contador.className = 'badge bg-success fs-6 px-3 py-2';
-        } else {
+        } else if (filtro === 'pendente') {
             contador.textContent = `Mostrando pendentes (${visiveisCount})`;
             contador.className = 'badge bg-warning text-dark fs-6 px-3 py-2';
+        } else if (filtro === 'malote') {
+            contador.textContent = `Mostrando malote (${visiveisCount})`;
+            contador.className = 'badge bg-danger fs-6 px-3 py-2';
         }
         
         totalSpan.textContent = `(${visiveisCount})`;
