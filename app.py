@@ -4,7 +4,8 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import json
-import pyt
+import pytz
+
 
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///assinaturas.db')
 if database_url.startswith('postgres://'):
