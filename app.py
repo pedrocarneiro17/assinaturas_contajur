@@ -386,20 +386,20 @@ def editar_prazo_documento(id):
         
         # Converter string para date
         from datetime import datetime
-        documento.prazo = datetime.strptime(novo_prazo, '%Y-%m-%d').date()
+        documento.prazo_entrega = datetime.strptime(novo_prazo, '%Y-%m-%d').date() 
         
         db.session.commit()
         
         return jsonify({
             'sucesso': True, 
-            'prazo_formatado': documento.prazo.strftime('%d/%m/%Y')
+            'prazo_formatado': documento.prazo_entrega.strftime('%d/%m/%Y')  
         })
     except ValueError:
         return jsonify({'sucesso': False, 'erro': 'Data inválida'}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
-
+    
 @app.route('/api/documentos/reordenar', methods=['POST'])
 def reordenar_documentos():
     if 'user_id' not in session:
