@@ -5,7 +5,10 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-person-plus"></i> Cadastrar Novo Cliente</h5>
+                <h5 class="mb-0">
+                    <i class="bi bi-{% if cliente %}pencil{% else %}person-plus{% endif %}"></i> 
+                    {% if cliente %}Editar Cliente{% else %}Cadastrar Novo Cliente{% endif %}
+                </h5>
             </div>
             <div class="card-body">
                 {% if erro %}
@@ -18,20 +21,25 @@
                 <form method="POST" onsubmit="return validarFormulario()">
                     <div class="mb-3">
                         <label for="nome" class="form-label">Nome / Razão Social *</label>
-                        <input type="text" class="form-control" id="nome" name="nome" required autofocus>
+                        <input type="text" class="form-control" id="nome" name="nome" 
+                               value="{{ cliente.nome if cliente else '' }}" required autofocus>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Tipo *</label>
                         <div>
                             <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="tipo" id="tipoPF" value="PF" checked onchange="alterarTipo()">
+                                <input class="form-check-input" type="radio" name="tipo" id="tipoPF" value="PF" 
+                                       {% if not cliente or cliente.tipo == 'PF' %}checked{% endif %} 
+                                       onchange="alterarTipo()">
                                 <label class="form-check-label" for="tipoPF">
                                     Pessoa Física
                                 </label>
                             </div>
                             <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="tipo" id="tipoPJ" value="PJ" onchange="alterarTipo()">
+                                <input class="form-check-input" type="radio" name="tipo" id="tipoPJ" value="PJ" 
+                                       {% if cliente and cliente.tipo == 'PJ' %}checked{% endif %} 
+                                       onchange="alterarTipo()">
                                 <label class="form-check-label" for="tipoPJ">
                                     Pessoa Jurídica
                                 </label>
@@ -40,15 +48,22 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="documento" class="form-label" id="labelDocumento">CPF *</label>
-                        <input type="text" class="form-control" id="documento" name="documento" placeholder="000.000.000-00" required>
-                        <small class="form-text text-muted" id="helperDocumento">Formato: 000.000.000-00</small>
+                        <label for="documento" class="form-label" id="labelDocumento">
+                            {% if cliente and cliente.tipo == 'PJ' %}CNPJ *{% else %}CPF *{% endif %}
+                        </label>
+                        <input type="text" class="form-control" id="documento" name="documento" 
+                               value="{{ cliente.documento if cliente else '' }}"
+                               placeholder="{% if cliente and cliente.tipo == 'PJ' %}00.000.000/0000-00{% else %}000.000.000-00{% endif %}" 
+                               required>
+                        <small class="form-text text-muted" id="helperDocumento">
+                            Formato: {% if cliente and cliente.tipo == 'PJ' %}00.000.000/0000-00{% else %}000.000.000-00{% endif %}
+                        </small>
                         <div class="invalid-feedback" id="documentoError"></div>
                     </div>
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Salvar
+                            <i class="bi bi-save"></i> {% if cliente %}Atualizar{% else %}Salvar{% endif %}
                         </button>
                         <a href="{{ url_for('clientes') }}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Cancelar

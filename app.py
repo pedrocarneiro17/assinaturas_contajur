@@ -219,6 +219,43 @@ def novo_cliente():
     
     return render_template('cliente_form.html')
 
+@app.route('/cliente/<int:id>/editar', methods=['GET', 'POST'])
+def editar_cliente(id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    cliente = Cliente.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        tipo = request.form.get('tipo')
+        documento = request.form.get('documento').replace('.', '').replace('-', '').replace('/', '')
+        
+        if tipo == 'PF':
+            if len(documento) != 11 or not documento.isdigit():
+                return render_template('cliente_form.html', cliente=cliente, erro='CPF inválido. Deve conter 11 dígitos.')
+            documento_formatado = f'{documento[:3]}.{documento[3:6]}.{documento[6:9]}-{documento[9:]}'
+        else:
+            if len(documento) != 14 or not documento.isdigit():
+                return render_template('cliente_form.html', cliente=cliente, erro='CNPJ inválido. Deve conter 14 dígitos.')
+            documento_formatado = f'{documento[:2]}.{documento[2:5]}.{documento[5:8]}/{documento[8:12]}-{documento[12:]}'
+        
+        # Verificar se documento já existe (exceto o próprio cliente)
+        cliente_existente = Cliente.query.filter_by(documento=documento_formatado).first()
+        if cliente_existente and cliente_existente.id != cliente.id:
+            return render_template('cliente_form.html', cliente=cliente, erro='Este CPF/CNPJ já está cadastrado.')
+        
+        # Atualizar dados
+        cliente.nome = nome
+        cliente.tipo = tipo
+        cliente.documento = documento_formatado
+        
+        db.session.commit()
+        
+        return redirect(url_for('clientes'))
+    
+    return render_template('cliente_form.html', cliente=cliente)
+
 @app.route('/documento/novo', methods=['GET', 'POST'])
 def novo_documento():
     if 'user_id' not in session:
@@ -333,6 +370,35 @@ def visualizar_documento(id):
     
     documento = Documento.query.get_or_404(id)
     return render_template('visualizar.html', documento=documento)
+
+@app.route('/documento/<int:id>/editar_prazo', methods=['POST'])
+def editar_prazo_documento(id):
+    if 'user_id' not in session:
+        return jsonify({'sucesso': False, 'erro': 'Não autenticado'}), 401
+    
+    documento = Documento.query.get_or_404(id)
+    
+    try:
+        novo_prazo = request.json.get('prazo')
+        
+        if not novo_prazo:
+            return jsonify({'sucesso': False, 'erro': 'Prazo não informado'}), 400
+        
+        # Converter string para date
+        from datetime import datetime
+        documento.prazo = datetime.strptime(novo_prazo, '%Y-%m-%d').date()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'sucesso': True, 
+            'prazo_formatado': documento.prazo.strftime('%d/%m/%Y')
+        })
+    except ValueError:
+        return jsonify({'sucesso': False, 'erro': 'Data inválida'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 @app.route('/api/documentos/reordenar', methods=['POST'])
 def reordenar_documentos():

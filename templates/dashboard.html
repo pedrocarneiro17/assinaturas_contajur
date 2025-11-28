@@ -138,7 +138,16 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td>{{ doc.prazo_entrega.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            <span id="prazo-display-{{ doc.id }}">
+                                {{ doc.prazo_entrega.strftime('%d/%m/%Y') }}
+                            </span>
+                            <button class="btn btn-sm btn-link p-0 ms-1" 
+                                    onclick="editarPrazo({{ doc.id }}, '{{ doc.prazo_entrega.strftime('%Y-%m-%d') }}')"
+                                    title="Editar prazo">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                        </td>
                         <td>
                             {% if doc.status == 'assinado' %}
                             <span class="badge bg-success status-badge">
@@ -178,6 +187,34 @@
             <p class="mt-3">Nenhum documento encontrado</p>
         </div>
         {% endif %}
+    </div>
+</div>
+
+<!-- Modal Editar Prazo -->
+<div class="modal fade" id="modalEditarPrazo" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-event"></i> Editar Prazo de Entrega
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="novoPrazo" class="form-label">Novo Prazo *</label>
+                    <input type="date" class="form-control" id="novoPrazo" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="salvarNovoPrazo()">
+                    <i class="bi bi-save"></i> Salvar
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -268,6 +305,52 @@
             situacoesOcultas.style.display = 'none';
             toggleText.textContent = '+ ' + (totalSituacoes - 2) + ' mais';
         }
+    }
+    
+    // ========== FUNCIONALIDADE DE EDITAR PRAZO ==========
+    let documentoIdEdicao = null;
+    const modalEditarPrazo = new bootstrap.Modal(document.getElementById('modalEditarPrazo'));
+    
+    function editarPrazo(documentoId, prazoAtual) {
+        documentoIdEdicao = documentoId;
+        document.getElementById('novoPrazo').value = prazoAtual;
+        modalEditarPrazo.show();
+    }
+    
+    function salvarNovoPrazo() {
+        const novoPrazo = document.getElementById('novoPrazo').value;
+        
+        if (!novoPrazo) {
+            alert('Por favor, informe o prazo');
+            return;
+        }
+        
+        fetch(`/documento/${documentoIdEdicao}/editar_prazo`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ prazo: novoPrazo })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.sucesso) {
+                document.getElementById(`prazo-display-${documentoIdEdicao}`).textContent = data.prazo_formatado;
+                modalEditarPrazo.hide();
+                
+                // Feedback visual de sucesso
+                const prazoElement = document.getElementById(`prazo-display-${documentoIdEdicao}`);
+                prazoElement.classList.add('text-success', 'fw-bold');
+                setTimeout(() => {
+                    prazoElement.classList.remove('text-success', 'fw-bold');
+                }, 2000);
+            } else {
+                alert('Erro: ' + data.erro);
+            }
+        })
+        .catch(error => {
+            alert('Erro ao atualizar prazo: ' + error);
+        });
     }
 </script>
 {% endblock %}

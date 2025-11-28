@@ -39,10 +39,19 @@
                         <td>{{ cliente.data_cadastro.strftime('%d/%m/%Y') }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ url_for('historico_cliente', id=cliente.id) }}" class="btn btn-info" title="Histórico">
+                                <a href="{{ url_for('editar_cliente', id=cliente.id) }}" 
+                                   class="btn btn-warning" 
+                                   title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('historico_cliente', id=cliente.id) }}" 
+                                   class="btn btn-info" 
+                                   title="Histórico">
                                     <i class="bi bi-clock-history"></i>
                                 </a>
-                                <button onclick="confirmarExclusao({{ cliente.id }}, '{{ cliente.nome }}')" class="btn btn-danger" title="Excluir">
+                                <button onclick="confirmarExclusao({{ cliente.id }}, '{{ cliente.nome }}')" 
+                                        class="btn btn-danger" 
+                                        title="Excluir">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
