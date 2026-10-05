@@ -6,7 +6,37 @@
     <title>{% block title %}Sistema de Assinaturas{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
     <style>
+        :root {
+            --cj-primary: #0d6efd;
+            --cj-bg: #f4f6fb;
+            --cj-radius: 12px;
+            --cj-sidebar-w: 250px;
+        }
+        body { background: var(--cj-bg); }
+        .card {
+            border: 0;
+            border-radius: var(--cj-radius);
+            box-shadow: 0 1px 3px rgba(16,24,40,.08), 0 1px 2px rgba(16,24,40,.04);
+        }
+        .card-header:first-child { border-radius: var(--cj-radius) var(--cj-radius) 0 0; }
+        .btn, .form-control, .form-select { border-radius: 8px; }
+        .table > :not(caption) > * > * { padding: .75rem; vertical-align: middle; }
+        .ts-wrapper.form-select-sm .ts-control { min-height: 31px; padding-top: 2px; padding-bottom: 2px; font-size: .875rem; }
+        .card-header.bg-primary { background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%) !important; }
+        .btn:focus-visible, .form-control:focus, .form-select:focus { box-shadow: 0 0 0 .2rem rgba(13,110,253,.2); }
+        .avatar {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: #e7f0ff; color: #0a58ca; font-weight: 600;
+            display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .page-title { font-size: 1.5rem; font-weight: 600; }
+        @media (max-width: 575.98px) {
+            .page-title { font-size: 1.25rem; }
+            .form-actions { flex-direction: column; }
+            .form-actions .btn { width: 100%; }
+        }
         .signature-canvas {
             border: 2px solid #dee2e6;
             border-radius: 8px;
@@ -141,10 +171,23 @@
             left: 270px;
         }
         
-        @media (max-width: 768px) {
-            .main-content {
-                padding: 80px 15px 20px;
-            }
+        .sidebar-backdrop {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 999;
+        }
+        body.menu-open .sidebar-backdrop { display: block; }
+
+        @media (min-width: 992px) {
+            .sidebar { transform: translateX(0); }
+            .main-content, body.menu-open .main-content { margin-left: var(--cj-sidebar-w); padding: 30px; }
+            .mobile-menu-toggle, .sidebar-backdrop { display: none !important; }
+        }
+        @media (max-width: 991.98px) {
+            body.menu-open .main-content { margin-left: 0; }
+            body.menu-open .mobile-menu-toggle { left: 20px; }
+            .main-content { padding: 76px 14px 20px; }
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -156,6 +199,8 @@
         <i class="bi bi-list"></i>
     </button>
     
+    <div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -164,13 +209,13 @@
         
         <div class="sidebar-menu">
             <nav class="nav flex-column">
-                <a class="nav-link" href="{{ url_for('dashboard') }}">
+                <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </a>
-                <a class="nav-link" href="{{ url_for('clientes') }}">
+                <a class="nav-link {% if request.endpoint == 'clientes' %}active{% endif %}" href="{{ url_for('clientes') }}">
                     <i class="bi bi-people-fill"></i> Clientes
                 </a>
-                <a class="nav-link" href="{{ url_for('novo_documento') }}">
+                <a class="nav-link {% if request.endpoint == 'novo_documento' %}active{% endif %}" href="{{ url_for('novo_documento') }}">
                     <i class="bi bi-file-earmark-plus-fill"></i> Novo Documento
                 </a>
             </nav>
@@ -203,6 +248,7 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
         function toggleSidebar() {
@@ -211,28 +257,16 @@
             document.body.classList.toggle('menu-open');
         }
         
-        // Fechar sidebar ao clicar fora (mobile)
-        document.addEventListener('click', function(event) {
-            const sidebar = document.getElementById('sidebar');
-            const toggle = document.querySelector('.mobile-menu-toggle');
-            
-            if (window.innerWidth <= 768 && sidebar && toggle) {
-                if (!sidebar.contains(event.target) && !toggle.contains(event.target)) {
-                    sidebar.classList.remove('show');
-                    document.body.classList.remove('menu-open');
-                }
-            }
-        });
-        
-        // Fechar menu ao clicar em um link (mobile)
-        if (window.innerWidth <= 768) {
-            document.querySelectorAll('.sidebar .nav-link').forEach(link => {
-                link.addEventListener('click', function() {
-                    document.getElementById('sidebar').classList.remove('show');
-                    document.body.classList.remove('menu-open');
-                });
+        // Busca por digitação em selects marcados com .select-busca
+        document.querySelectorAll('select.select-busca').forEach(el => {
+            new TomSelect(el, {
+                allowEmptyOption: true,
+                maxOptions: null,
+                searchField: ['text', 'digits'],
+                placeholder: el.dataset.placeholder || 'Digite para buscar...',
+                render: { no_results: () => '<div class="no-results">Nenhum cliente encontrado</div>' }
             });
-        }
+        });
     </script>
     {% block extra_js %}{% endblock %}
 </body>

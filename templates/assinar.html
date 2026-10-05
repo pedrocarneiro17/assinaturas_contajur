@@ -159,10 +159,10 @@
                     <p class="text-muted">Desenhe sua assinatura abaixo usando o mouse ou touch</p>
                     
                     <div class="d-flex justify-content-center mb-3">
-                        <canvas id="signature-pad" class="signature-canvas" width="700" height="300"></canvas>
+                        <canvas id="signature-pad" class="signature-canvas" width="700" height="300" style="width:100%;max-width:700px;height:auto;aspect-ratio:7/3;"></canvas>
                     </div>
 
-                    <div class="d-flex gap-2 justify-content-center mb-3">
+                    <div class="d-flex flex-wrap gap-2 justify-content-center mb-3">
                         <button type="button" class="btn btn-outline-secondary" onclick="limparAssinatura()">
                             <i class="bi bi-eraser"></i> Limpar
                         </button>
@@ -289,18 +289,29 @@
         canvas.dispatchEvent(mouseEvent);
     });
 
+    // Converte a posição do ponteiro para as coordenadas internas do canvas (o canvas pode estar redimensionado via CSS)
+    function posicao(e) {
+        const rect = canvas.getBoundingClientRect();
+        const escalaX = canvas.width / canvas.clientWidth;
+        const escalaY = canvas.height / canvas.clientHeight;
+        return {
+            x: (e.clientX - rect.left - canvas.clientLeft) * escalaX,
+            y: (e.clientY - rect.top - canvas.clientTop) * escalaY
+        };
+    }
+
     function iniciarDesenho(e) {
         desenhando = true;
         assinado = true;
-        const rect = canvas.getBoundingClientRect();
+        const p = posicao(e);
         ctx.beginPath();
-        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        ctx.moveTo(p.x, p.y);
     }
 
     function desenhar(e) {
         if (!desenhando) return;
-        const rect = canvas.getBoundingClientRect();
-        ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+        const p = posicao(e);
+        ctx.lineTo(p.x, p.y);
         ctx.stroke();
     }
 

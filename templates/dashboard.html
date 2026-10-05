@@ -1,9 +1,19 @@
 {% extends "base.html" %}
 
+{% block extra_css %}
+<style>
+    .stat-card { transition: transform .15s, box-shadow .15s; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,24,40,.12); }
+    .stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+    .stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+    .min-w-0 { min-width: 0; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row mb-4">
     <div class="col">
-        <h2><i class="bi bi-speedometer2"></i> Dashboard - Documentos</h2>
+        <h2 class="page-title"><i class="bi bi-speedometer2"></i> Documentos</h2>
     </div>
     <div class="col-auto">
         <a href="{{ url_for('novo_documento') }}" class="btn btn-primary">
@@ -12,27 +22,61 @@
     </div>
 </div>
 
+<!-- Resumo -->
+<div class="row g-3 mb-4">
+    {% set cards = [
+        ('Pendentes', resumo.pendentes, 'bi-clock-history', 'warning', url_for('dashboard', status='pendente')),
+        ('Atrasados', resumo.atrasados, 'bi-exclamation-triangle-fill', 'danger', url_for('dashboard', atalho='atrasados')),
+        ('Vencem hoje', resumo.hoje, 'bi-calendar-event-fill', 'info', url_for('dashboard', atalho='hoje')),
+        ('Concluídos no mês', resumo.mes, 'bi-check-circle-fill', 'success', url_for('dashboard', atalho='mes')),
+    ] %}
+    {% for titulo, valor, icone, cor, link in cards %}
+    <div class="col-6 col-lg-3">
+        <a href="{{ link }}" class="text-decoration-none">
+            <div class="card stat-card h-100 border-start border-4 border-{{ cor }}">
+                <div class="card-body d-flex align-items-center gap-3 py-3">
+                    <div class="stat-icon bg-{{ cor }}-subtle text-{{ cor }}-emphasis"><i class="bi {{ icone }}"></i></div>
+                    <div>
+                        <div class="stat-value text-body">{{ valor }}</div>
+                        <div class="small text-muted">{{ titulo }}</div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+{% if atalho %}
+<div class="alert alert-secondary d-flex justify-content-between align-items-center py-2">
+    <span><i class="bi bi-funnel"></i> Filtro rápido:
+        <strong>{{ {'atrasados': 'Atrasados', 'hoje': 'Vencem hoje', 'mes': 'Concluídos no mês'}.get(atalho, atalho) }}</strong></span>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-secondary" onclick="localStorage.removeItem('dashboard_filtros')">Limpar</a>
+</div>
+{% endif %}
+
 <!-- Filtros -->
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-2 align-items-end">
-            <div class="col-md-1">
+            {% if atalho %}<input type="hidden" name="atalho" value="{{ atalho }}">{% endif %}
+            <div class="col-6 col-md-3 col-xl-1">
                 <label class="form-label small">Criação (De)</label>
                 <input type="date" class="form-control form-control-sm" name="data_criacao_inicio" value="{{ request.args.get('data_criacao_inicio', '') }}">
             </div>
-            <div class="col-md-1">
+            <div class="col-6 col-md-3 col-xl-1">
                 <label class="form-label small">Criação (Até)</label>
                 <input type="date" class="form-control form-control-sm" name="data_criacao_fim" value="{{ request.args.get('data_criacao_fim', '') }}">
             </div>
-            <div class="col-md-1">
+            <div class="col-6 col-md-3 col-xl-1">
                 <label class="form-label small">Prazo (De)</label>
                 <input type="date" class="form-control form-control-sm" name="prazo_inicio" value="{{ request.args.get('prazo_inicio', '') }}">
             </div>
-            <div class="col-md-1">
+            <div class="col-6 col-md-3 col-xl-1">
                 <label class="form-label small">Prazo (Até)</label>
                 <input type="date" class="form-control form-control-sm" name="prazo_fim" value="{{ request.args.get('prazo_fim', '') }}">
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-3 col-xl-2">
                 <label class="form-label small">Status</label>
                 <select class="form-select form-select-sm" name="status">
                     <option value="">Todos</option>
@@ -41,7 +85,7 @@
                     <option value="coletado" {% if request.args.get('status') == 'coletado' %}selected{% endif %}>Coletado</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-3 col-xl-2">
                 <label class="form-label small">Departamento</label>
                 <select class="form-select form-select-sm" name="departamento">
                     <option value="">Todos</option>
@@ -52,18 +96,18 @@
                     <option value="pessoal" {% if request.args.get('departamento') == 'pessoal' %}selected{% endif %}>Pessoal</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-md-6 col-xl-3">
                 <label class="form-label small">Cliente</label>
-                <select class="form-select form-select-sm" name="cliente">
+                <select class="form-select form-select-sm select-busca" name="cliente" data-placeholder="Todos os clientes">
                     <option value="">Todos os clientes</option>
                     {% for cliente in clientes %}
-                    <option value="{{ cliente.id }}" {% if request.args.get('cliente') == cliente.id|string %}selected{% endif %}>
-                        {{ cliente.nome }}
+                    <option value="{{ cliente.id }}" data-digits="{{ cliente.documento|replace('.','')|replace('-','')|replace('/','') }}" {% if request.args.get('cliente') == cliente.id|string %}selected{% endif %}>
+                        {{ cliente.nome }} - {{ cliente.documento }}
                     </option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-1 d-flex gap-1">
+            <div class="col-12 col-md-3 col-xl-1 d-flex gap-1">
                 <button type="submit" class="btn btn-primary btn-sm flex-fill" title="Filtrar">
                     <i class="bi bi-filter"></i>
                 </button>
@@ -80,21 +124,21 @@
     <div class="card-header bg-white">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Documentos ({{ documentos|length }})</h5>
-            <small class="text-muted">Arraste para reorganizar a rota</small>
+            <small class="text-muted d-none d-md-inline">Arraste para reorganizar a rota</small>
         </div>
     </div>
     <div class="card-body p-0">
         {% if documentos %}
-        <div class="table-responsive">
+        <div class="table-responsive d-none d-md-block">
             <table class="table table-hover mb-0">
                 <thead class="table-light">
                     <tr>
                         <th width="30"></th>
                         <th>Cliente</th>
-                        <th>Situações</th>
+                        <th class="d-none d-md-table-cell">Situações</th>
                         <th>Prazo</th>
                         <th>Status</th>
-                        <th>Data Criação</th>
+                        <th class="d-none d-lg-table-cell">Data Criação</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -108,7 +152,7 @@
                             <strong>{{ doc.cliente.nome }}</strong><br>
                             <small class="text-muted">{{ doc.cliente.documento }}</small>
                         </td>
-                        <td>
+                        <td class="d-none d-md-table-cell">
                             {% set situacoes_ordenadas = doc.situacoes_list|sort(attribute='ordem') %}
                             <div id="situacoes-{{ doc.id }}">
                                 {% for sit in situacoes_ordenadas[:2] %}
@@ -139,9 +183,14 @@
                             </div>
                         </td>
                         <td>
-                            <span id="prazo-display-{{ doc.id }}">
+                            {% set dias = (doc.prazo_entrega - hoje).days %}
+                            {% set prazo_cls = 'text-danger fw-semibold' if (doc.status == 'pendente' and dias < 0) else ('text-warning-emphasis fw-semibold' if (doc.status == 'pendente' and dias <= 2) else '') %}
+                            <span class="prazo-display {{ prazo_cls }}" data-doc="{{ doc.id }}">
                                 {{ doc.prazo_entrega.strftime('%d/%m/%Y') }}
                             </span>
+                            {% if doc.status == 'pendente' and dias < 0 %}<span class="badge bg-danger-subtle text-danger-emphasis ms-1">{{ -dias }}d atraso</span>
+                            {% elif doc.status == 'pendente' and dias == 0 %}<span class="badge bg-warning-subtle text-warning-emphasis ms-1">hoje</span>
+                            {% elif doc.status == 'pendente' and dias <= 2 %}<span class="badge bg-warning-subtle text-warning-emphasis ms-1">{{ dias }}d</span>{% endif %}
                             <button class="btn btn-sm btn-link p-0 ms-1" 
                                     onclick="editarPrazo({{ doc.id }}, '{{ doc.prazo_entrega.strftime('%Y-%m-%d') }}')"
                                     title="Editar prazo">
@@ -159,7 +208,7 @@
                             </span>
                             {% endif %}
                         </td>
-                        <td>{{ doc.data_criacao.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="d-none d-lg-table-cell">{{ doc.data_criacao.strftime('%d/%m/%Y %H:%M') }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">
                                 {% if doc.status == 'pendente' %}
@@ -180,6 +229,54 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Cards (mobile) -->
+        <div class="d-md-none p-2">
+            {% for doc in documentos %}
+            {% set dias = (doc.prazo_entrega - hoje).days %}
+            {% set atrasado = doc.status == 'pendente' and dias < 0 %}
+            <div class="card doc-card mb-2 border-start border-4 border-{% if doc.status != 'pendente' %}success{% elif atrasado %}danger{% elif dias <= 2 %}warning{% else %}secondary{% endif %}">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="min-w-0">
+                            <div class="fw-semibold">{{ doc.cliente.nome }}</div>
+                            <small class="text-muted">{{ doc.cliente.documento }}</small>
+                        </div>
+                        {% if doc.status == 'assinado' %}
+                        <span class="badge bg-success flex-shrink-0">{% if doc.eh_malote %}Coletado{% else %}Assinado{% endif %}</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark flex-shrink-0">Pendente</span>
+                        {% endif %}
+                    </div>
+                    <div class="mt-2 small">
+                        {% for sit in doc.situacoes_list|sort(attribute='ordem') %}
+                        <div class="mb-1">• {{ sit.texto }}
+                            <span class="badge bg-{% if sit.departamento == 'fiscal' %}info{% elif sit.departamento == 'pessoal' %}secondary{% elif sit.departamento == 'contabil' %}warning text-dark{% elif sit.departamento == 'financeiro' %}success{% elif sit.departamento == 'malote' %}danger{% else %}dark{% endif %}" style="font-size:.65rem;">{{ sit.departamento|upper }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="small mt-2">
+                        <i class="bi bi-calendar3"></i>
+                        <span class="prazo-display {% if atrasado %}text-danger fw-semibold{% endif %}" data-doc="{{ doc.id }}">{{ doc.prazo_entrega.strftime('%d/%m/%Y') }}</span>
+                        {% if atrasado %}<span class="badge bg-danger-subtle text-danger-emphasis">{{ -dias }}d atraso</span>{% endif %}
+                        <button class="btn btn-sm btn-link p-0 ms-1" onclick="editarPrazo({{ doc.id }}, '{{ doc.prazo_entrega.strftime('%Y-%m-%d') }}')" title="Editar prazo">
+                            <i class="bi bi-pencil-square"></i>
+                        </button>
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        {% if doc.status == 'pendente' %}
+                        <a href="{{ url_for('assinar_documento', id=doc.id) }}" class="btn btn-primary flex-fill">
+                            <i class="bi bi-pen"></i> {% if doc.eh_malote %}Confirmar Malote{% else %}Coletar Assinatura{% endif %}
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('visualizar_documento', id=doc.id) }}" class="btn btn-info flex-fill"><i class="bi bi-eye"></i> Visualizar</a>
+                        {% endif %}
+                        <a href="{{ url_for('historico_cliente', id=doc.cliente.id) }}" class="btn btn-outline-secondary" title="Histórico"><i class="bi bi-clock-history"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
         </div>
         {% else %}
         <div class="text-center py-5 text-muted">
@@ -335,15 +432,14 @@
         .then(response => response.json())
         .then(data => {
             if (data.sucesso) {
-                document.getElementById(`prazo-display-${documentoIdEdicao}`).textContent = data.prazo_formatado;
                 modalEditarPrazo.hide();
-                
-                // Feedback visual de sucesso
-                const prazoElement = document.getElementById(`prazo-display-${documentoIdEdicao}`);
-                prazoElement.classList.add('text-success', 'fw-bold');
-                setTimeout(() => {
-                    prazoElement.classList.remove('text-success', 'fw-bold');
-                }, 2000);
+
+                // Atualiza e dá feedback visual (tabela e cards)
+                document.querySelectorAll(`.prazo-display[data-doc="${documentoIdEdicao}"]`).forEach(el => {
+                    el.textContent = data.prazo_formatado;
+                    el.classList.add('text-success', 'fw-bold');
+                    setTimeout(() => el.classList.remove('text-success', 'fw-bold'), 2000);
+                });
             } else {
                 alert('Erro: ' + data.erro);
             }

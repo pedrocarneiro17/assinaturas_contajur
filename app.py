@@ -126,6 +126,8 @@ def dashboard():
     status_filtro = request.args.get('status')
     cliente_filtro = request.args.get('cliente')
     departamento_filtro = request.args.get('departamento')
+    atalho = request.args.get('atalho')
+    hoje = agora_brasilia().date()
     
     query = Documento.query
     
@@ -161,10 +163,31 @@ def dashboard():
     if cliente_filtro:
         query = query.filter(Documento.cliente_id == int(cliente_filtro))
     
-    documentos = query.order_by(Documento.ordem, Documento.data_criacao.desc()).all()
-    clientes = Cliente.query.all()
+    # Atalhos dos cards de resumo
+    if atalho == 'atrasados':
+        query = query.filter(Documento.status == 'pendente', Documento.prazo_entrega < hoje)
+    elif atalho == 'hoje':
+        query = query.filter(Documento.status == 'pendente', Documento.prazo_entrega == hoje)
+    elif atalho == 'mes':
+        inicio_mes = hoje.replace(day=1)
+        query = query.filter(Documento.status == 'assinado',
+                             db.func.date(Documento.data_assinatura) >= inicio_mes)
     
-    return render_template('dashboard.html', documentos=documentos, clientes=clientes)
+    documentos = query.distinct().order_by(Documento.ordem, Documento.data_criacao.desc()).all()
+    clientes = Cliente.query.order_by(Cliente.nome).all()
+    
+    # Resumo (sempre sobre todos os documentos, independente dos filtros)
+    inicio_mes = hoje.replace(day=1)
+    resumo = {
+        'pendentes': Documento.query.filter_by(status='pendente').count(),
+        'atrasados': Documento.query.filter(Documento.status == 'pendente', Documento.prazo_entrega < hoje).count(),
+        'hoje': Documento.query.filter(Documento.status == 'pendente', Documento.prazo_entrega == hoje).count(),
+        'mes': Documento.query.filter(Documento.status == 'assinado',
+                                      db.func.date(Documento.data_assinatura) >= inicio_mes).count(),
+    }
+    
+    return render_template('dashboard.html', documentos=documentos, clientes=clientes,
+                           resumo=resumo, hoje=hoje, atalho=atalho)
 
 @app.route('/clientes')
 def clientes():
