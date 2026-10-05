@@ -11,6 +11,9 @@ import pytz
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///assinaturas.db')
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+# Força o driver psycopg2 (SQLAlchemy 2.1+ usa psycopg v3 por padrão)
+if database_url.startswith('postgresql://'):
+    database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sua-chave-secreta-aqui-mude-em-producao')
