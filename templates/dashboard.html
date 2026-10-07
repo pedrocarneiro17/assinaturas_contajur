@@ -96,7 +96,7 @@
                     <option value="pessoal" {% if request.args.get('departamento') == 'pessoal' %}selected{% endif %}>Pessoal</option>
                 </select>
             </div>
-            <div class="col-12 col-md-6 col-xl-3">
+            <div class="col-12 col-md-6 col-xl-2">
                 <label class="form-label small">Cliente</label>
                 <select class="form-select form-select-sm select-busca" name="cliente" data-placeholder="Todos os clientes">
                     <option value="">Todos os clientes</option>
@@ -107,12 +107,21 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-12 col-md-3 col-xl-1 d-flex gap-1">
-                <button type="submit" class="btn btn-primary btn-sm flex-fill" title="Filtrar">
-                    <i class="bi bi-filter"></i>
+            <div class="col-12 col-md-6 col-xl-2">
+                <label class="form-label small">Coletado por</label>
+                <select class="form-select form-select-sm" name="coletado_por">
+                    <option value="">Todos</option>
+                    {% for nome in coletores %}
+                    <option value="{{ nome }}" {% if request.args.get('coletado_por') == nome %}selected{% endif %}>{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-filter"></i> Filtrar
                 </button>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm flex-fill" title="Limpar">
-                    <i class="bi bi-x-circle"></i>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-x-circle"></i> Limpar
                 </a>
             </div>
         </form>
@@ -207,6 +216,7 @@
                                 <i class="bi bi-clock"></i> Pendente
                             </span>
                             {% endif %}
+                            {% if doc.coletado_por %}<small class="text-muted d-block mt-1"><i class="bi bi-person-check"></i> {{ doc.coletado_por }}</small>{% endif %}
                         </td>
                         <td class="d-none d-lg-table-cell">{{ doc.data_criacao.strftime('%d/%m/%Y %H:%M') }}</td>
                         <td>
@@ -249,6 +259,7 @@
                         <span class="badge bg-warning text-dark flex-shrink-0">Pendente</span>
                         {% endif %}
                     </div>
+                    {% if doc.coletado_por %}<div class="small text-muted mt-1"><i class="bi bi-person-check"></i> Coletado por {{ doc.coletado_por }}</div>{% endif %}
                     <div class="mt-2 small">
                         {% for sit in doc.situacoes_list|sort(attribute='ordem') %}
                         <div class="mb-1">• {{ sit.texto }}

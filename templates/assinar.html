@@ -76,7 +76,17 @@
                         <p class="text-muted mb-0">Este malote não requer assinatura do cliente</p>
                     </div>
 
-                    <div class="d-flex gap-2 justify-content-center mb-3">
+                    <div class="mx-auto mb-4 text-start" style="max-width: 420px;">
+                        <label for="coletado_por" class="form-label fw-semibold">Coletado por *</label>
+                        <input type="text" class="form-control form-control-lg" id="coletado_por" name="coletado_por"
+                               list="lista-coletores" maxlength="200" autocomplete="off"
+                               placeholder="Nome de quem coletou" required>
+                        <datalist id="lista-coletores">
+                            {% for nome in coletores %}<option value="{{ nome }}">{% endfor %}
+                        </datalist>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 justify-content-center mb-3">
                         <button type="button" class="btn btn-success btn-lg" onclick="confirmarMalote()">
                             <i class="bi bi-check-circle"></i> Confirmar Coleta
                         </button>
@@ -162,6 +172,16 @@
                         <canvas id="signature-pad" class="signature-canvas" width="700" height="300" style="width:100%;max-width:700px;height:auto;aspect-ratio:7/3;"></canvas>
                     </div>
 
+                    <div class="mx-auto mb-4 text-start" style="max-width: 420px;">
+                        <label for="coletado_por" class="form-label fw-semibold">Coletado por *</label>
+                        <input type="text" class="form-control form-control-lg" id="coletado_por" name="coletado_por"
+                               list="lista-coletores" maxlength="200" autocomplete="off"
+                               placeholder="Nome de quem coletou" required>
+                        <datalist id="lista-coletores">
+                            {% for nome in coletores %}<option value="{{ nome }}">{% endfor %}
+                        </datalist>
+                    </div>
+
                     <div class="d-flex flex-wrap gap-2 justify-content-center mb-3">
                         <button type="button" class="btn btn-outline-secondary" onclick="limparAssinatura()">
                             <i class="bi bi-eraser"></i> Limpar
@@ -195,16 +215,32 @@
 
 {% block extra_js %}
 <script>
+    // Lê e valida o nome de quem coletou (obrigatório)
+    function nomeColetor() {
+        const campo = document.getElementById('coletado_por');
+        const nome = campo.value.trim().replace(/\s+/g, ' ');
+        if (!nome) {
+            campo.classList.add('is-invalid');
+            campo.focus();
+            alert('Informe o nome de quem coletou a assinatura.');
+            return '';
+        }
+        campo.classList.remove('is-invalid');
+        return nome;
+    }
+
     {% if documento.eh_malote %}
     // Função para confirmar malote
     function confirmarMalote() {
+        const coletadoPor = nomeColetor();
+        if (!coletadoPor) return;
         if (confirm('Confirmar que os documentos foram coletados no cliente?')) {
             fetch('{{ url_for("salvar_assinatura", id=documento.id) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ assinatura: null, malote: true })
+                body: JSON.stringify({ assinatura: null, malote: true, coletado_por: coletadoPor })
             })
             .then(response => response.json())
             .then(data => {
@@ -212,7 +248,7 @@
                     alert('Coleta de malote confirmada com sucesso!');
                     window.location.href = '{{ url_for("dashboard") }}';
                 } else {
-                    alert('Erro ao confirmar coleta.');
+                    alert(data.erro || 'Erro ao confirmar coleta.');
                 }
             })
             .catch(error => {
@@ -330,6 +366,9 @@
             return;
         }
 
+        const coletadoPor = nomeColetor();
+        if (!coletadoPor) return;
+
         const dataURL = canvas.toDataURL('image/png');
         
         fetch('{{ url_for("salvar_assinatura", id=documento.id) }}', {
@@ -337,7 +376,7 @@
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ assinatura: dataURL })
+            body: JSON.stringify({ assinatura: dataURL, coletado_por: coletadoPor })
         })
         .then(response => response.json())
         .then(data => {

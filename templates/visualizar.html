@@ -124,6 +124,11 @@
                         <div class="col-md-6">
                             <strong>Data de Criação:</strong> {{ documento.data_criacao.strftime('%d/%m/%Y às %H:%M') }}
                         </div>
+                        {% if documento.coletado_por %}
+                        <div class="col-md-6 mt-2">
+                            <strong>Coletado por:</strong> {{ documento.coletado_por }}
+                        </div>
+                        {% endif %}
                         <div class="col-md-6">
                             {% if documento.eh_malote %}
                             <strong>Status:</strong> <span class="badge bg-danger">Malote - Sem assinatura</span>

@@ -74,6 +74,7 @@ class Documento(db.Model):
     data_assinatura = db.Column(db.DateTime)
     assinatura = db.Column(db.Text)
     eh_malote = db.Column(db.Boolean, default=False)
+    coletado_por = db.Column(db.String(200))  # quem coletou a assinatura (obrigatório nas novas coletas)
     
     cliente = db.relationship('Cliente', backref='documentos')
     # situacoes_list já está definido no relacionamento da classe Situacao
@@ -86,6 +87,13 @@ class Situacao(db.Model):
     ordem = db.Column(db.Integer, default=0)
     
     documento = db.relationship('Documento', backref=db.backref('situacoes_list', lazy=True, cascade='all, delete-orphan'))
+
+def listar_coletores():
+    """Nomes já usados em 'coletado_por' (para sugestão e filtro)."""
+    linhas = db.session.query(Documento.coletado_por).filter(
+        Documento.coletado_por.isnot(None), Documento.coletado_por != ''
+    ).distinct().order_by(Documento.coletado_por).all()
+    return [l[0] for l in linhas]
 
 # Rotas
 @app.route('/')
@@ -130,6 +138,7 @@ def dashboard():
     cliente_filtro = request.args.get('cliente')
     departamento_filtro = request.args.get('departamento')
     atalho = request.args.get('atalho')
+    coletado_por_filtro = request.args.get('coletado_por')
     hoje = agora_brasilia().date()
     
     query = Documento.query
@@ -166,6 +175,9 @@ def dashboard():
     if cliente_filtro:
         query = query.filter(Documento.cliente_id == int(cliente_filtro))
     
+    if coletado_por_filtro:
+        query = query.filter(Documento.coletado_por == coletado_por_filtro)
+
     # Atalhos dos cards de resumo
     if atalho == 'atrasados':
         query = query.filter(Documento.status == 'pendente', Documento.prazo_entrega < hoje)
@@ -190,7 +202,7 @@ def dashboard():
     }
     
     return render_template('dashboard.html', documentos=documentos, clientes=clientes,
-                           resumo=resumo, hoje=hoje, atalho=atalho)
+                           resumo=resumo, hoje=hoje, atalho=atalho, coletores=listar_coletores())
 
 @app.route('/clientes')
 def clientes():
@@ -337,7 +349,7 @@ def assinar_documento(id):
         return redirect(url_for('login'))
     
     documento = Documento.query.get_or_404(id)
-    return render_template('assinar.html', documento=documento)
+    return render_template('assinar.html', documento=documento, coletores=listar_coletores())
 
 @app.route('/documento/<int:id>/salvar-assinatura', methods=['POST'])
 def salvar_assinatura(id):
@@ -345,6 +357,12 @@ def salvar_assinatura(id):
         return jsonify({'erro': 'Não autenticado'}), 401
     
     documento = Documento.query.get_or_404(id)
+    
+    # Nome de quem coletou é obrigatório (vale para assinatura e malote)
+    coletado_por = ' '.join((request.json.get('coletado_por') or '').split())
+    if not coletado_por:
+        return jsonify({'erro': 'Informe o nome de quem coletou a assinatura'}), 400
+    documento.coletado_por = coletado_por[:200]
     
     # Verificar se é confirmação de malote
     is_malote = request.json.get('malote', False)
@@ -445,6 +463,14 @@ def reordenar_documentos():
 def init_db():
     with app.app_context():
         db.create_all()
+
+        # Migração leve: adiciona colunas novas em bancos já existentes
+        colunas = [c['name'] for c in db.inspect(db.engine).get_columns('documento')]
+        if 'coletado_por' not in colunas:
+            with db.engine.begin() as conn:
+                conn.execute(db.text('ALTER TABLE documento ADD COLUMN coletado_por VARCHAR(200)'))
+            print("✅ Coluna documento.coletado_por criada")
+
         
         # Pegar credenciais do ambiente (Railway)
         admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
